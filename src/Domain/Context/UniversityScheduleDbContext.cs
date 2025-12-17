@@ -39,5 +39,27 @@ namespace Domain.Context
                 Assembly.GetAssembly(typeof(StructureConfiguration)) ??
                 throw new InvalidOperationException("Could not find configuration assembly"));
         }
+
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            var entries = ChangeTracker
+                .Entries<BaseEntity>()
+                .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified);
+
+            foreach (var entityEntry in entries)
+            {
+                // Always set the UpdatedAt on every change
+                entityEntry.Entity.UpdatedAt = DateTime.UtcNow;
+
+                // If it's a brand new record, set the CreatedAt too 
+                // (Though your GETUTCDATE() default in SQL also handles this)
+                if (entityEntry.State == EntityState.Added)
+                {
+                    entityEntry.Entity.CreatedAt = DateTime.UtcNow;
+                }
+            }
+
+            return base.SaveChangesAsync(cancellationToken);
+        }
     }
 }
