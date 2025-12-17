@@ -10,10 +10,8 @@ namespace Domain.Entities
     /// The numerator and denominator week patterns are created as parent schedules,
     /// and subsequent weeks are linked via ScheduleParentId for easy updates and exceptions.
     /// </remarks>
-    public class Schedule
+    public class Schedule : BaseEntity
     {
-        public int Id { get; set; }
-
         /// <summary>
         /// Gets or sets the subject ID for this schedule entry.
         /// </summary>
@@ -69,14 +67,12 @@ namespace Domain.Entities
         /// Gets or sets the date of this schedule entry.
         /// </summary>
         public DateTime ScheduleDate { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime? UpdatedAt { get; set; }
 
         // Relationships
         public Subject Subject { get; set; } = null!;
         public TimeTable TimeTable { get; set; } = null!;
         public Classroom Classroom { get; set; } = null!;
-        public Staff Staff { get; set; } = null!;
+        public Lecturer Staff { get; set; } = null!;
         public Schedule? ScheduleParent { get; set; }
         public ICollection<Schedule> ScheduleExceptions { get; set; } = new List<Schedule>();
         public Semester Semester { get; set; } = null!;

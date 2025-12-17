@@ -4,15 +4,14 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Domain.Configurations
 {
-    public class StructureConfiguration : IEntityTypeConfiguration<Structure>
+    public class StructureConfiguration : BaseEntityConfiguration<Structure>
     {
-        public void Configure(EntityTypeBuilder<Structure> builder)
+        public override void Configure(EntityTypeBuilder<Structure> builder)
         {
-            builder.HasKey(x => x.Id);
+            base.Configure(builder);
 
             builder.Property(x => x.Code).IsRequired().HasMaxLength(50);
             builder.Property(x => x.Type).HasConversion<byte>();
-            builder.Property(x => x.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
 
             builder.HasOne(x => x.Parent)
                 .WithMany(x => x.Children)

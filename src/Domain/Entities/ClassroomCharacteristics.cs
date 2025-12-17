@@ -9,9 +9,8 @@ namespace Domain.Entities
     /// These characteristics determine the classroom's suitability
     /// for specific types of lessons and subjects.
     /// </remarks>
-    public class ClassroomCharacteristics
+    public class ClassroomCharacteristics : BaseEntity
     {
-        public int Id { get; set; }
         public int ClassroomId { get; set; }
 
         /// <summary>
@@ -42,8 +41,6 @@ namespace Domain.Entities
         /// Values: NotAvailable, Poor, Good.
         /// </remarks>
         public BlackboardCondition BlackboardCondition { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime? UpdatedAt { get; set; }
 
         // Relationships
         public Classroom Classroom { get; set; } = null!;

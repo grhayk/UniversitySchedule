@@ -4,14 +4,13 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Domain.Configurations
 {
-    public class GroupConfiguration : IEntityTypeConfiguration<Group>
+    public class GroupConfiguration : BaseEntityConfiguration<Group>
     {
-        public void Configure(EntityTypeBuilder<Group> builder)
+        public override void Configure(EntityTypeBuilder<Group> builder)
         {
-            builder.HasKey(x => x.Id);
+            base.Configure(builder);
 
             builder.Property(x => x.IsActive).HasDefaultValue(true);
-            builder.Property(x => x.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
 
             builder.HasOne(x => x.Parent)
                 .WithMany(x => x.Children)

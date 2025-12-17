@@ -1,9 +1,7 @@
 ﻿namespace Domain.Entities
 {
-    public class Classroom
+    public class Classroom : BaseEntity
     {
-        public int Id { get; set; }
-
         /// <summary>
         /// Gets or sets the classroom name or number (e.g., "5113").
         /// </summary>
@@ -16,8 +14,6 @@
         /// Null if the classroom is not assigned to a specific structure.
         /// </remarks>
         public int? StructureId { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime? UpdatedAt { get; set; }
 
         // Relationships
         public Structure? Structure { get; set; }

@@ -2,8 +2,8 @@
 {
     public enum LessonType : byte
     {
-        Lecture = 0,
-        Practical = 1,
-        Laboratory = 2
+        Lecture = 1,
+        Practical = 2,
+        Laboratory = 3
     }
 }

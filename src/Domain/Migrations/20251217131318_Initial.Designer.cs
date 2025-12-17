@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Domain.Migrations
 {
     [DbContext(typeof(UniversityScheduleDbContext))]
-    [Migration("20251215071823_addedBranchedFromGroupId")]
-    partial class addedBranchedFromGroupId
+    [Migration("20251217131318_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -143,6 +143,54 @@ namespace Domain.Migrations
                     b.ToTable("EducationPrograms");
                 });
 
+            modelBuilder.Entity("Domain.Entities.EducationProgramSubject", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<int>("EducationProgramId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("FromDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SemesterId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SemesterId1")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SubjectId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ToDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SemesterId");
+
+                    b.HasIndex("SemesterId1");
+
+                    b.HasIndex("SubjectId");
+
+                    b.HasIndex("EducationProgramId", "SubjectId", "SemesterId")
+                        .IsUnique();
+
+                    b.ToTable("EducationProgramSubjects");
+                });
+
             modelBuilder.Entity("Domain.Entities.Group", b =>
                 {
                     b.Property<int>("Id")
@@ -198,7 +246,7 @@ namespace Domain.Migrations
                     b.ToTable("Groups");
                 });
 
-            modelBuilder.Entity("Domain.Entities.GroupSubjectWithStaff", b =>
+            modelBuilder.Entity("Domain.Entities.GroupSubjectWithLecturer", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -234,6 +282,85 @@ namespace Domain.Migrations
                         .IsUnique();
 
                     b.ToTable("GroupSubjectsWithStaff");
+                });
+
+            modelBuilder.Entity("Domain.Entities.LecturerSubject", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<int>("StaffId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SubjectId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StaffId");
+
+                    b.HasIndex("SubjectId");
+
+                    b.ToTable("StaffSubjects");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Person", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("BirthDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PersonType")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("nvarchar(8)");
+
+                    b.Property<int>("StructureId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StructureId");
+
+                    b.ToTable("Person");
+
+                    b.HasDiscriminator<string>("PersonType").HasValue("Person");
+
+                    b.UseTphMappingStrategy();
                 });
 
             modelBuilder.Entity("Domain.Entities.Schedule", b =>
@@ -315,6 +442,9 @@ namespace Domain.Migrations
                     b.Property<int>("ScheduleId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
                     b.HasKey("Id");
 
                     b.HasIndex("GroupId");
@@ -347,64 +477,15 @@ namespace Domain.Migrations
                     b.Property<int>("Number")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
                     b.HasKey("Id");
 
                     b.HasIndex("EducationDegree", "EducationType", "Number")
                         .IsUnique();
 
                     b.ToTable("Semesters");
-                });
-
-            modelBuilder.Entity("Domain.Entities.Staff", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Staff");
-                });
-
-            modelBuilder.Entity("Domain.Entities.StaffSubject", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
-
-                    b.Property<int>("StaffId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SubjectId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StaffId");
-
-                    b.HasIndex("SubjectId");
-
-                    b.ToTable("StaffSubjects");
                 });
 
             modelBuilder.Entity("Domain.Entities.Structure", b =>
@@ -450,43 +531,6 @@ namespace Domain.Migrations
                     b.ToTable("Structures");
                 });
 
-            modelBuilder.Entity("Domain.Entities.Student", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
-
-                    b.Property<byte>("EducationDegree")
-                        .HasColumnType("tinyint");
-
-                    b.Property<byte>("EducationType")
-                        .HasColumnType("tinyint");
-
-                    b.Property<int>("GroupId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("StructureId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GroupId");
-
-                    b.HasIndex("StructureId");
-
-                    b.ToTable("Students");
-                });
-
             modelBuilder.Entity("Domain.Entities.StudentGroup", b =>
                 {
                     b.Property<int>("Id")
@@ -508,6 +552,9 @@ namespace Domain.Migrations
 
                     b.Property<int>("StudentId")
                         .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
@@ -581,12 +628,40 @@ namespace Domain.Migrations
                     b.Property<TimeOnly>("StartTime")
                         .HasColumnType("time");
 
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
                     b.HasKey("Id");
 
                     b.HasIndex("StartTime", "EndTime")
                         .IsUnique();
 
                     b.ToTable("TimeTables");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Lecturer", b =>
+                {
+                    b.HasBaseType("Domain.Entities.Person");
+
+                    b.HasDiscriminator().HasValue("Lecturer");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Student", b =>
+                {
+                    b.HasBaseType("Domain.Entities.Person");
+
+                    b.Property<byte?>("EducationDegree")
+                        .HasColumnType("tinyint");
+
+                    b.Property<byte?>("EducationType")
+                        .HasColumnType("tinyint");
+
+                    b.Property<int?>("GroupId")
+                        .HasColumnType("int");
+
+                    b.HasIndex("GroupId");
+
+                    b.HasDiscriminator().HasValue("Student");
                 });
 
             modelBuilder.Entity("Domain.Entities.Classroom", b =>
@@ -628,6 +703,37 @@ namespace Domain.Migrations
                     b.Navigation("Structure");
                 });
 
+            modelBuilder.Entity("Domain.Entities.EducationProgramSubject", b =>
+                {
+                    b.HasOne("Domain.Entities.EducationProgram", "EducationProgram")
+                        .WithMany("EducationProgramSubjects")
+                        .HasForeignKey("EducationProgramId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Semester", "Semester")
+                        .WithMany()
+                        .HasForeignKey("SemesterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Semester", null)
+                        .WithMany("EducationProgramSubjects")
+                        .HasForeignKey("SemesterId1");
+
+                    b.HasOne("Domain.Entities.Subject", "Subject")
+                        .WithMany("EducationProgramSubjects")
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EducationProgram");
+
+                    b.Navigation("Semester");
+
+                    b.Navigation("Subject");
+                });
+
             modelBuilder.Entity("Domain.Entities.Group", b =>
                 {
                     b.HasOne("Domain.Entities.Group", "BranchedFromGroup")
@@ -661,7 +767,7 @@ namespace Domain.Migrations
                     b.Navigation("Semester");
                 });
 
-            modelBuilder.Entity("Domain.Entities.GroupSubjectWithStaff", b =>
+            modelBuilder.Entity("Domain.Entities.GroupSubjectWithLecturer", b =>
                 {
                     b.HasOne("Domain.Entities.Group", "Group")
                         .WithMany("GroupSubjectsWithStaff")
@@ -669,7 +775,7 @@ namespace Domain.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Domain.Entities.StaffSubject", "StaffSubject")
+                    b.HasOne("Domain.Entities.LecturerSubject", "StaffSubject")
                         .WithMany("GroupSubjectsWithStaff")
                         .HasForeignKey("StaffSubjectId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -678,6 +784,36 @@ namespace Domain.Migrations
                     b.Navigation("Group");
 
                     b.Navigation("StaffSubject");
+                });
+
+            modelBuilder.Entity("Domain.Entities.LecturerSubject", b =>
+                {
+                    b.HasOne("Domain.Entities.Lecturer", "Staff")
+                        .WithMany("StaffSubjects")
+                        .HasForeignKey("StaffId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Subject", "Subject")
+                        .WithMany("StaffSubjects")
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Staff");
+
+                    b.Navigation("Subject");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Person", b =>
+                {
+                    b.HasOne("Domain.Entities.Structure", "Structure")
+                        .WithMany()
+                        .HasForeignKey("StructureId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Structure");
                 });
 
             modelBuilder.Entity("Domain.Entities.Schedule", b =>
@@ -699,7 +835,7 @@ namespace Domain.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Domain.Entities.Staff", "Staff")
+                    b.HasOne("Domain.Entities.Lecturer", "Staff")
                         .WithMany("Schedules")
                         .HasForeignKey("StaffId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -749,25 +885,6 @@ namespace Domain.Migrations
                     b.Navigation("Schedule");
                 });
 
-            modelBuilder.Entity("Domain.Entities.StaffSubject", b =>
-                {
-                    b.HasOne("Domain.Entities.Staff", "Staff")
-                        .WithMany("StaffSubjects")
-                        .HasForeignKey("StaffId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Entities.Subject", "Subject")
-                        .WithMany("StaffSubjects")
-                        .HasForeignKey("SubjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Staff");
-
-                    b.Navigation("Subject");
-                });
-
             modelBuilder.Entity("Domain.Entities.Structure", b =>
                 {
                     b.HasOne("Domain.Entities.Structure", "Parent")
@@ -776,25 +893,6 @@ namespace Domain.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Parent");
-                });
-
-            modelBuilder.Entity("Domain.Entities.Student", b =>
-                {
-                    b.HasOne("Domain.Entities.Group", "Group")
-                        .WithMany("Students")
-                        .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Entities.Structure", "Structure")
-                        .WithMany()
-                        .HasForeignKey("StructureId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Group");
-
-                    b.Navigation("Structure");
                 });
 
             modelBuilder.Entity("Domain.Entities.StudentGroup", b =>
@@ -851,6 +949,16 @@ namespace Domain.Migrations
                     b.Navigation("Structure");
                 });
 
+            modelBuilder.Entity("Domain.Entities.Student", b =>
+                {
+                    b.HasOne("Domain.Entities.Group", "Group")
+                        .WithMany("Students")
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Group");
+                });
+
             modelBuilder.Entity("Domain.Entities.Classroom", b =>
                 {
                     b.Navigation("Characteristics");
@@ -861,6 +969,8 @@ namespace Domain.Migrations
             modelBuilder.Entity("Domain.Entities.EducationProgram", b =>
                 {
                     b.Navigation("Children");
+
+                    b.Navigation("EducationProgramSubjects");
 
                     b.Navigation("Groups");
                 });
@@ -878,6 +988,11 @@ namespace Domain.Migrations
                     b.Navigation("Students");
                 });
 
+            modelBuilder.Entity("Domain.Entities.LecturerSubject", b =>
+                {
+                    b.Navigation("GroupSubjectsWithStaff");
+                });
+
             modelBuilder.Entity("Domain.Entities.Schedule", b =>
                 {
                     b.Navigation("ScheduleExceptions");
@@ -887,6 +1002,8 @@ namespace Domain.Migrations
 
             modelBuilder.Entity("Domain.Entities.Semester", b =>
                 {
+                    b.Navigation("EducationProgramSubjects");
+
                     b.Navigation("Groups");
 
                     b.Navigation("Schedules");
@@ -894,18 +1011,6 @@ namespace Domain.Migrations
                     b.Navigation("StudentGroups");
 
                     b.Navigation("Subjects");
-                });
-
-            modelBuilder.Entity("Domain.Entities.Staff", b =>
-                {
-                    b.Navigation("Schedules");
-
-                    b.Navigation("StaffSubjects");
-                });
-
-            modelBuilder.Entity("Domain.Entities.StaffSubject", b =>
-                {
-                    b.Navigation("GroupSubjectsWithStaff");
                 });
 
             modelBuilder.Entity("Domain.Entities.Structure", b =>
@@ -919,13 +1024,10 @@ namespace Domain.Migrations
                     b.Navigation("Subjects");
                 });
 
-            modelBuilder.Entity("Domain.Entities.Student", b =>
-                {
-                    b.Navigation("StudentGroups");
-                });
-
             modelBuilder.Entity("Domain.Entities.Subject", b =>
                 {
+                    b.Navigation("EducationProgramSubjects");
+
                     b.Navigation("Schedules");
 
                     b.Navigation("StaffSubjects");
@@ -934,6 +1036,18 @@ namespace Domain.Migrations
             modelBuilder.Entity("Domain.Entities.TimeTable", b =>
                 {
                     b.Navigation("Schedules");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Lecturer", b =>
+                {
+                    b.Navigation("Schedules");
+
+                    b.Navigation("StaffSubjects");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Student", b =>
+                {
+                    b.Navigation("StudentGroups");
                 });
 #pragma warning restore 612, 618
         }

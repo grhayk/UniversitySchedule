@@ -2,7 +2,7 @@
 {
     public enum RenovationStatus : byte
     {
-        Good = 0,
-        NeedsRenovation = 1
+        Good = 1,
+        NeedsRenovation = 2
     }
 }

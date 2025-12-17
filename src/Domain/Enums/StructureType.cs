@@ -2,8 +2,8 @@
 {
     public enum StructureType : byte
     {
-        University = 0,
-        Institute = 1,
-        Chair = 2
+        University = 1,
+        Institute = 2,
+        Chair = 3
     }
 }

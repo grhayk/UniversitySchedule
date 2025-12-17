@@ -1,11 +1,9 @@
 ﻿namespace Domain.Entities
 {
-    public class TimeTable : BaseEntity
+    public class Lecturer : Person
     {
-        public TimeOnly StartTime { get; set; }
-        public TimeOnly EndTime { get; set; }
-
         // Relationships
         public ICollection<Schedule> Schedules { get; set; } = new List<Schedule>();
+        public ICollection<LecturerSubject> StaffSubjects { get; set; } = new List<LecturerSubject>();
     }
 }

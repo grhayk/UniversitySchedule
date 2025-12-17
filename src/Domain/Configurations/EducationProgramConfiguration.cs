@@ -4,14 +4,13 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Domain.Configurations
 {
-    public class EducationProgramConfiguration : IEntityTypeConfiguration<EducationProgram>
+    public class EducationProgramConfiguration : BaseEntityConfiguration<EducationProgram>
     {
-        public void Configure(EntityTypeBuilder<EducationProgram> builder)
+        public override void Configure(EntityTypeBuilder<EducationProgram> builder)
         {
-            builder.HasKey(x => x.Id);
+            base.Configure(builder);
 
             builder.Property(x => x.Code).IsRequired().HasMaxLength(50);
-            builder.Property(x => x.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
 
             builder.HasOne(x => x.Structure)
                 .WithMany(x => x.EducationPrograms)

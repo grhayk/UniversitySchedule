@@ -2,7 +2,7 @@
 {
     public enum WeekType : byte
     {
-        Numerator = 0,
-        Denominator = 1
+        Numerator = 1,
+        Denominator = 2
     }
 }

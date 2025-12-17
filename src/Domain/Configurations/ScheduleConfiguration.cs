@@ -4,15 +4,14 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Domain.Configurations
 {
-    public class ScheduleConfiguration : IEntityTypeConfiguration<Schedule>
+    public class ScheduleConfiguration : BaseEntityConfiguration<Schedule>
     {
-        public void Configure(EntityTypeBuilder<Schedule> builder)
+        public override void Configure(EntityTypeBuilder<Schedule> builder)
         {
-            builder.HasKey(x => x.Id);
+            base.Configure(builder);
 
             builder.Property(x => x.LessonTypeId).HasConversion<byte>();
             builder.Property(x => x.WeekType).HasConversion<byte>();
-            builder.Property(x => x.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
 
             builder.HasOne(x => x.Subject)
                 .WithMany(x => x.Schedules)

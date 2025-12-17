@@ -10,10 +10,8 @@ namespace Domain.Entities
     /// This is the base organizational level for grouping education programs,
     /// subjects, and classrooms.
     /// </remarks>
-    public class Structure
+    public class Structure : BaseEntity
     {
-        public int Id { get; set; }
-
         /// <summary>
         /// Gets or sets the parent structure ID for hierarchical relationships.
         /// </summary>
@@ -40,8 +38,6 @@ namespace Domain.Entities
         /// Gets or sets the date when this structure was dissolved (if applicable).
         /// </summary>
         public DateTime? ToDate { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime? UpdatedAt { get; set; }
 
         // Relationships
         public Structure? Parent { get; set; }

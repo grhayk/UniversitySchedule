@@ -9,10 +9,8 @@ namespace Domain.Entities
     /// Groups can be hierarchical (main group → subgroups for different lesson types).
     /// Each group is associated with a semester.
     /// </remarks>
-    public class Group
+    public class Group : BaseEntity
     {
-        public int Id { get; set; }
-
         /// <summary>
         /// Gets or sets the parent group ID for hierarchical relationships.
         /// </summary>
@@ -55,8 +53,6 @@ namespace Domain.Entities
         /// Gets or sets a group id from which this group was branched. Can happen after 6th semester for certain education program groups.
         /// </summary>
         public int? BranchedFromGroupId { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime? UpdatedAt { get; set; }
 
         // Relationships
         public Group? Parent { get; set; }
@@ -67,6 +63,6 @@ namespace Domain.Entities
         public ICollection<Student> Students { get; set; } = new List<Student>();
         public ICollection<StudentGroup> StudentGroups { get; set; } = new List<StudentGroup>();
         public ICollection<ScheduleGroup> ScheduleGroups { get; set; } = new List<ScheduleGroup>();
-        public ICollection<GroupSubjectWithStaff> GroupSubjectsWithStaff { get; set; } = new List<GroupSubjectWithStaff>();
+        public ICollection<GroupSubjectWithLecturer> GroupSubjectsWithStaff { get; set; } = new List<GroupSubjectWithLecturer>();
     }
 }

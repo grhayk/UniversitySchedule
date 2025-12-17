@@ -2,8 +2,8 @@
 {
     public enum BlackboardCondition : byte
     {
-        NotAvailable = 0,
-        Poor = 1,
-        Good = 2
+        NotAvailable = 1,
+        Poor = 2,
+        Good = 3
     }
 }

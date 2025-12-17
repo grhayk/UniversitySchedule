@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Domain.Configurations
 {
-    public class TimeTableConfiguration : IEntityTypeConfiguration<TimeTable>
+    public class TimeTableConfiguration : BaseEntityConfiguration<TimeTable>
     {
-        public void Configure(EntityTypeBuilder<TimeTable> builder)
+        public override void Configure(EntityTypeBuilder<TimeTable> builder)
         {
-            builder.HasKey(x => x.Id);
+            base.Configure(builder);
 
             builder.Property(x => x.StartTime).HasColumnType("time");
             builder.Property(x => x.EndTime).HasColumnType("time");

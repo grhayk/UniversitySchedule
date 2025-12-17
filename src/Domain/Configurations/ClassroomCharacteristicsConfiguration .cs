@@ -4,16 +4,15 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Domain.Configurations
 {
-    public class ClassroomCharacteristicsConfiguration : IEntityTypeConfiguration<ClassroomCharacteristics>
+    public class ClassroomCharacteristicsConfiguration : BaseEntityConfiguration<ClassroomCharacteristics>
     {
-        public void Configure(EntityTypeBuilder<ClassroomCharacteristics> builder)
+        public override void Configure(EntityTypeBuilder<ClassroomCharacteristics> builder)
         {
-            builder.HasKey(x => x.Id);
+            base.Configure(builder);
 
             builder.Property(x => x.Type).HasConversion<byte>();
             builder.Property(x => x.RenovationStatus).HasConversion<byte>();
             builder.Property(x => x.BlackboardCondition).HasConversion<byte>();
-            builder.Property(x => x.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
 
             builder.HasOne(x => x.Classroom)
                 .WithOne(x => x.Characteristics)

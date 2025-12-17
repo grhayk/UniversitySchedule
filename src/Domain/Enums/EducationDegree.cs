@@ -2,8 +2,8 @@
 {
     public enum EducationDegree : byte
     {
-        Bachelor = 0,
-        Master = 1,
-        PhD = 2
+        Bachelor = 1,
+        Master = 2,
+        PhD = 3
     }
 }

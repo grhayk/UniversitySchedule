@@ -2,7 +2,7 @@
 {
     public enum EducationType : byte
     {
-        Stationary = 0,
-        Remote = 1
+        Stationary = 1,
+        Remote = 2
     }
 }

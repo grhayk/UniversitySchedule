@@ -2,15 +2,15 @@
 {
     public enum ClassroomType : byte
     {
-        Laboratory = 0,
-        Chair = 1,
-        StudentCouncil = 2,
-        DirectClassroom = 3,
-        Cabinet = 4,
-        DirectorOffice = 5,
-        Hall = 6,
-        ChairRoom = 7,
-        ATS = 8,
-        Teleconference = 9
+        Laboratory = 1,
+        Chair = 2,
+        StudentCouncil = 3,
+        DirectClassroom = 4,
+        Cabinet = 5,
+        DirectorOffice = 6,
+        Hall = 7,
+        ChairRoom = 8,
+        ATS = 9,
+        Teleconference = 10
     }
 }

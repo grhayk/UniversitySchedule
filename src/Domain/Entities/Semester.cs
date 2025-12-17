@@ -9,10 +9,8 @@ namespace Domain.Entities
     /// Semesters are defined by education degree, education type, and semester number.
     /// For example: Bachelor's program, Stationary education, Semester 1.
     /// </remarks>
-    public class Semester
+    public class Semester : BaseEntity
     {
-        public int Id { get; set; }
-
         /// <summary>
         /// Gets or sets the education degree level.
         /// </summary>
@@ -33,7 +31,6 @@ namespace Domain.Entities
         /// Gets or sets the semester number (1-10). Remote education has 10 semesters.
         /// </summary>
         public int Number { get; set; }
-        public DateTime CreatedAt { get; set; }
 
         // Relationships
         /// <summary>
@@ -51,5 +48,6 @@ namespace Domain.Entities
         /// Gets or sets the schedules for this semester.
         /// </summary>
         public ICollection<Schedule> Schedules { get; set; } = new List<Schedule>();
+        public ICollection<EducationProgramSubject> EducationProgramSubjects { get; set; } = new List<EducationProgramSubject>();
     }
 }
