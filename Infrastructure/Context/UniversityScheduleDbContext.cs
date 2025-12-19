@@ -12,22 +12,22 @@ namespace Infrastructure.Context
         }
 
         // DbSets
-        public DbSet<Structure> Structures { get; set; } = null!;
-        public DbSet<Semester> Semesters { get; set; } = null!;
-        public DbSet<EducationProgram> EducationPrograms { get; set; } = null!;
-        public DbSet<Group> Groups { get; set; } = null!;
-        public DbSet<Student> Students { get; set; } = null!;
-        public DbSet<StudentGroup> StudentGroups { get; set; } = null!;
-        public DbSet<Subject> Subjects { get; set; } = null!;
-        public DbSet<TimeTable> TimeTables { get; set; } = null!;
-        public DbSet<Classroom> Classrooms { get; set; } = null!;
-        public DbSet<ClassroomCharacteristics> ClassroomCharacteristics { get; set; } = null!;
-        public DbSet<Lecturer> Lecturers { get; set; } = null!;
-        public DbSet<Schedule> Schedules { get; set; } = null!;
-        public DbSet<ScheduleGroup> ScheduleGroups { get; set; } = null!;
-        public DbSet<LecturerSubject> StaffSubjects { get; set; } = null!;
-        public DbSet<GroupSubjectWithLecturer> GroupSubjectsWithStaff { get; set; } = null!;
-        public DbSet<EducationProgramSubject> EducationProgramSubjects { get; set; } = null!;
+        public DbSet<Structure> Structures => Set<Structure>();
+        public DbSet<Semester> Semesters => Set<Semester>();
+        public DbSet<EducationProgram> EducationPrograms => Set<EducationProgram>();
+        public DbSet<Group> Groups => Set<Group>();
+        public DbSet<Student> Students => Set<Student>();
+        public DbSet<StudentGroup> StudentGroups => Set<StudentGroup>();
+        public DbSet<Subject> Subjects => Set<Subject>();
+        public DbSet<TimeTable> TimeTables => Set<TimeTable>();
+        public DbSet<Classroom> Classrooms => Set<Classroom>();
+        public DbSet<ClassroomCharacteristics> ClassroomCharacteristics => Set<ClassroomCharacteristics>();
+        public DbSet<Lecturer> Lecturers => Set<Lecturer>();
+        public DbSet<Schedule> Schedules => Set<Schedule>();
+        public DbSet<ScheduleGroup> ScheduleGroups => Set<ScheduleGroup>();
+        public DbSet<LecturerSubject> StaffSubjects => Set<LecturerSubject>();
+        public DbSet<GroupSubjectWithLecturer> GroupSubjectsWithStaff => Set<GroupSubjectWithLecturer>();
+        public DbSet<EducationProgramSubject> EducationProgramSubjects => Set<EducationProgramSubject>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
