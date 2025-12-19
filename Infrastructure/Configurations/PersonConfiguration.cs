@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace Domain.Configurations
+namespace Infrastructure.Configurations
 {
     public class PersonConfiguration : BaseEntityConfiguration<Person>
     {

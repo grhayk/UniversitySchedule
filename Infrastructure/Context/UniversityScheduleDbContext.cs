@@ -1,9 +1,8 @@
-﻿using Domain.Configurations;
-using Domain.Entities;
+﻿using Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection;
 
-namespace Domain.Context
+namespace Infrastructure.Context
 {
     public class UniversityScheduleDbContext : DbContext
     {
@@ -36,7 +35,7 @@ namespace Domain.Context
 
             // Apply all configurations from the Configurations namespace
             modelBuilder.ApplyConfigurationsFromAssembly(
-                Assembly.GetAssembly(typeof(StructureConfiguration)) ??
+                Assembly.GetAssembly(typeof(UniversityScheduleDbContext)) ??
                 throw new InvalidOperationException("Could not find configuration assembly"));
         }
 
