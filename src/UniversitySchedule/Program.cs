@@ -1,4 +1,6 @@
+using Domain.Interfaces;
 using Infrastructure.Context;
+using Infrastructure.Implementations;
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,7 +24,7 @@ builder.Services.AddDbContext<UniversityScheduleDbContext>(options =>
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
-
+builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
    .AddNegotiate();
 

@@ -15,7 +15,7 @@ namespace Infrastructure.Configurations
             builder.HasOne(x => x.Structure)
                 .WithMany(x => x.Classrooms)
                 .HasForeignKey(x => x.StructureId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.HasIndex(x => x.Name).IsUnique();
         }

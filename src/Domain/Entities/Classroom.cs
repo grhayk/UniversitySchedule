@@ -10,13 +10,10 @@
         /// <summary>
         /// Gets or sets the structure this classroom belongs to.
         /// </summary>
-        /// <remarks>
-        /// Null if the classroom is not assigned to a specific structure.
-        /// </remarks>
-        public int? StructureId { get; set; }
+        public int StructureId { get; set; }
 
         // Relationships
-        public Structure? Structure { get; set; }
+        public Structure Structure { get; set; } = null!;
 
         /// <summary>
         /// Gets or sets the detailed characteristics of this classroom.
