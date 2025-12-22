@@ -4,19 +4,19 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Infrastructure.Configurations
 {
-    public class StaffSubjectConfiguration : BaseEntityConfiguration<LecturerSubject>
+    public class LecturerSubjectConfiguration : BaseEntityConfiguration<LecturerSubject>
     {
         public override void Configure(EntityTypeBuilder<LecturerSubject> builder)
         {
             base.Configure(builder);
 
-            builder.HasOne(x => x.Staff)
-                .WithMany(x => x.StaffSubjects)
-                .HasForeignKey(x => x.StaffId)
+            builder.HasOne(x => x.Lecturer)
+                .WithMany(x => x.LecturerSubjects)
+                .HasForeignKey(x => x.LecturerId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             builder.HasOne(x => x.Subject)
-                .WithMany(x => x.StaffSubjects)
+                .WithMany(x => x.LecturerSubjects)
                 .HasForeignKey(x => x.SubjectId)
                 .OnDelete(DeleteBehavior.Cascade);
         }

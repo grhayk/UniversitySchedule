@@ -28,9 +28,9 @@ namespace Infrastructure.Configurations
                 .HasForeignKey(x => x.ClassroomId)
                 .OnDelete(DeleteBehavior.NoAction);
 
-            builder.HasOne(x => x.Staff)
+            builder.HasOne(x => x.Lecturer)
                 .WithMany(x => x.Schedules)
-                .HasForeignKey(x => x.StaffId)
+                .HasForeignKey(x => x.LecturerId)
                 .OnDelete(DeleteBehavior.NoAction);
 
             builder.HasOne(x => x.ScheduleParent)

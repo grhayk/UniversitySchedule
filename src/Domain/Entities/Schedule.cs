@@ -44,9 +44,9 @@ namespace Domain.Entities
         public int ClassroomId { get; set; }
 
         /// <summary>
-        /// Gets or sets the staff member teaching this lesson.
+        /// Gets or sets the lecturer teaching this lesson.
         /// </summary>
-        public int StaffId { get; set; }
+        public int LecturerId { get; set; }
 
         /// <summary>
         /// Gets or sets the parent schedule ID for recurring schedules.
@@ -72,7 +72,7 @@ namespace Domain.Entities
         public Subject Subject { get; set; } = null!;
         public TimeTable TimeTable { get; set; } = null!;
         public Classroom Classroom { get; set; } = null!;
-        public Lecturer Staff { get; set; } = null!;
+        public Lecturer Lecturer { get; set; } = null!;
         public Schedule? ScheduleParent { get; set; }
         public ICollection<Schedule> ScheduleExceptions { get; set; } = new List<Schedule>();
         public Semester Semester { get; set; } = null!;

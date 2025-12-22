@@ -2,12 +2,12 @@
 {
     public class LecturerSubject : BaseEntity
     {
-        public int StaffId { get; set; }
+        public int LecturerId { get; set; }
         public int SubjectId { get; set; }
 
         // Relationships
-        public Lecturer Staff { get; set; } = null!;
+        public Lecturer Lecturer { get; set; } = null!;
         public Subject Subject { get; set; } = null!;
-        public ICollection<GroupSubjectWithLecturer> GroupSubjectsWithStaff { get; set; } = new List<GroupSubjectWithLecturer>();
+        public ICollection<GroupSubjectWithLecturer> GroupSubjectsWithLecturer { get; set; } = new List<GroupSubjectWithLecturer>();
     }
 }

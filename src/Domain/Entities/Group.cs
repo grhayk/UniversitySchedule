@@ -63,6 +63,6 @@ namespace Domain.Entities
         public ICollection<Student> Students { get; set; } = new List<Student>();
         public ICollection<StudentGroup> StudentGroups { get; set; } = new List<StudentGroup>();
         public ICollection<ScheduleGroup> ScheduleGroups { get; set; } = new List<ScheduleGroup>();
-        public ICollection<GroupSubjectWithLecturer> GroupSubjectsWithStaff { get; set; } = new List<GroupSubjectWithLecturer>();
+        public ICollection<GroupSubjectWithLecturer> GroupSubjectsWithLecturer { get; set; } = new List<GroupSubjectWithLecturer>();
     }
 }

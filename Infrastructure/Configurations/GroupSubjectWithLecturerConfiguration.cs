@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Infrastructure.Configurations
 {
-    public class GroupSubjectWithStaffConfiguration : BaseEntityConfiguration<GroupSubjectWithLecturer>
+    public class GroupSubjectWithLecturerConfiguration : BaseEntityConfiguration<GroupSubjectWithLecturer>
     {
         public override void Configure(EntityTypeBuilder<GroupSubjectWithLecturer> builder)
         {
@@ -12,17 +12,17 @@ namespace Infrastructure.Configurations
 
             builder.Property(x => x.LessonType).HasConversion<byte>();
 
-            builder.HasOne(x => x.StaffSubject)
-                .WithMany(x => x.GroupSubjectsWithStaff)
-                .HasForeignKey(x => x.StaffSubjectId)
+            builder.HasOne(x => x.LecturerSubject)
+                .WithMany(x => x.GroupSubjectsWithLecturer)
+                .HasForeignKey(x => x.LecturerSubjectId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             builder.HasOne(x => x.Group)
-                .WithMany(x => x.GroupSubjectsWithStaff)
+                .WithMany(x => x.GroupSubjectsWithLecturer)
                 .HasForeignKey(x => x.GroupId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            builder.HasIndex(x => new { x.StaffSubjectId, x.GroupId }).IsUnique();
+            builder.HasIndex(x => new { x.LecturerSubjectId, x.GroupId }).IsUnique();
         }
     }
 }

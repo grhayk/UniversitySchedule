@@ -4,6 +4,6 @@
     {
         // Relationships
         public ICollection<Schedule> Schedules { get; set; } = new List<Schedule>();
-        public ICollection<LecturerSubject> StaffSubjects { get; set; } = new List<LecturerSubject>();
+        public ICollection<LecturerSubject> LecturerSubjects { get; set; } = new List<LecturerSubject>();
     }
 }
