@@ -28,6 +28,8 @@ namespace Infrastructure.Context
         public DbSet<LecturerSubject> LecturerSubjects => Set<LecturerSubject>();
         public DbSet<GroupSubjectWithLecturer> GroupSubjectsWithLecturer => Set<GroupSubjectWithLecturer>();
         public DbSet<EducationProgramSubject> EducationProgramSubjects => Set<EducationProgramSubject>();
+        public DbSet<SubjectConfig> SubjectConfigs => Set<SubjectConfig>();
+        public DbSet<SubjectClassroom> SubjectClassrooms => Set<SubjectClassroom>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

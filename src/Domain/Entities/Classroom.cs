@@ -19,6 +19,7 @@
         /// Gets or sets the detailed characteristics of this classroom.
         /// </summary>
         public ClassroomCharacteristics? Characteristics { get; set; }
+        public ICollection<SubjectClassroom> SubjectClassrooms { get; set; } = new List<SubjectClassroom>();
         public ICollection<Schedule> Schedules { get; set; } = new List<Schedule>();
     }
 }

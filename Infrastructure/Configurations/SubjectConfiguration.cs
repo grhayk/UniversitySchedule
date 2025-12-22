@@ -11,6 +11,7 @@ namespace Infrastructure.Configurations
             base.Configure(builder);
 
             builder.Property(x => x.Code).IsRequired().HasMaxLength(50);
+            builder.Property(x => x.Name).IsRequired().HasMaxLength(100);
 
             builder.HasOne(x => x.SemesterFrom)
                 .WithMany(x => x.Subjects)
