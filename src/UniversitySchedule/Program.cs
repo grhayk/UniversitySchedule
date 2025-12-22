@@ -6,7 +6,11 @@ using Infrastructure.Context;
 using Infrastructure.Implementations;
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.DependencyInjection;
 using Serilog;
+using Serilog.Enrichers.Span;
+using System.Threading.RateLimiting;
 using UniversitySchedule.Filters;
 using UniversitySchedule.Middlewares;
 
@@ -14,6 +18,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
+    .Enrich.FromLogContext()
+    .Enrich.WithSpan() // Adds tracing/span information
     .WriteTo.Console()
     .WriteTo.File("logs/app.txt", rollingInterval: RollingInterval.Day)
     .Enrich.FromLogContext()
@@ -22,6 +28,7 @@ Log.Logger = new LoggerConfiguration()
     .CreateBootstrapLogger(); // Allows logging during startup
 
 builder.Host.UseSerilog(); // Plug into ASP.NET Core logging
+
 
 // Add services to the container.
 builder.Services.AddDbContext<UniversityScheduleDbContext>(options =>
@@ -37,6 +44,24 @@ builder.Services.AddDbContext<UniversityScheduleDbContext>(options =>
             // Tell EF Core where the migrations are
             sqlOptions.MigrationsAssembly(typeof(UniversityScheduleDbContext).Assembly.FullName);
         }));
+
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<UniversityScheduleDbContext>()
+    .AddCheck("Self", () => HealthCheckResult.Healthy("App is running")); // Basic self-check
+
+// Add services
+builder.Services.AddRateLimiter(options =>
+{
+    // Global: max 100 requests per minute per IP
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: partition => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1)
+            }));
+});
 
 builder.Services.AddControllers(options =>
 {
@@ -62,20 +87,19 @@ builder.Services.AddAuthorization(options =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
+app.UseMiddleware<GlobalExceptionMiddleware>(); // So can catch exceptions from all downstream middlewares
+app.UseHttpsRedirection(); // Redirect HTTP to HTTPS before any logic. Safe before routing.
 
-app.UseSerilogRequestLogging();
+app.UseRouting(); // Resolves which endpoint will handle the request.
 
-app.UseMiddleware<GlobalExceptionMiddleware>();
+app.UseSerilogRequestLogging(); // Should be after routing to capture endpoint info
 
-app.UseHttpsRedirection();
-
+app.UseRateLimiter(); // Needs routing to resolve endpoint
 app.UseAuthorization();
 
+app.MapGet("/throw", (hc) => throw new Exception("Boom!"));
+app.MapHealthChecks("/health");
+if (app.Environment.IsDevelopment()) app.MapOpenApi();
 app.MapControllers();
 
 app.Run();
