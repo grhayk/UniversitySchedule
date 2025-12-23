@@ -21,7 +21,7 @@ namespace Infrastructure.Configurations
                 .OnDelete(DeleteBehavior.Cascade);
 
             builder.HasOne(x => x.Semester)
-                .WithMany()
+                .WithMany(x => x.EducationProgramSubjects)
                 .HasForeignKey(x => x.SemesterId)
                 .OnDelete(DeleteBehavior.Restrict);
 

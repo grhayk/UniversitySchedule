@@ -7,7 +7,6 @@ using Infrastructure.Implementations;
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Serilog.Enrichers.Span;
 using System.Threading.RateLimiting;
