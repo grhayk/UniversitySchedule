@@ -1,4 +1,5 @@
 ﻿using Application.Core;
+using Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 
@@ -10,19 +11,31 @@ namespace UniversitySchedule.Filters
         {
             if (context.Result is ObjectResult objectResult && objectResult.Value is Result result)
             {
-                // Replace the result with a properly formatted HTTP response
-                var apiResponse = new
+                // 1. Determine the correct HTTP Status Code based on ErrorType
+                int statusCode = result.ErrorType switch
                 {
-                    success = result.IsSuccess,
-                    message = result.Message,
-                    errors = result.Errors,
-                    data = result is Result<object> r ? r.Data : null,
-                    statusCode = result.StatusCode
+                    ErrorType.None => StatusCodes.Status200OK,
+                    ErrorType.Validation => StatusCodes.Status400BadRequest,
+                    ErrorType.NotFound => StatusCodes.Status404NotFound,
+                    ErrorType.Conflict => StatusCodes.Status409Conflict,
+                    ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
+                    _ => StatusCodes.Status500InternalServerError
                 };
 
-                context.Result = new ObjectResult(apiResponse)
+                // 2. We return the Result object directly. 
+                // ASP.NET will serialize IsSuccess, Message, Errors, and Data (if present).
+                // We use the GetValue() helper to ensure the "Data" field is populated if it's a Result<T>.
+                var responsePayload = new
                 {
-                    StatusCode = result.StatusCode
+                    result.IsSuccess,
+                    result.Message,
+                    result.Errors,
+                    Data = result.GetValue()
+                };
+
+                context.Result = new ObjectResult(responsePayload)
+                {
+                    StatusCode = statusCode
                 };
             }
 

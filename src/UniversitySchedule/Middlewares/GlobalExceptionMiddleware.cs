@@ -1,4 +1,6 @@
-﻿using System.Text.Json;
+﻿using Domain.Enums;
+using System.Net;
+using System.Text.Json;
 
 namespace UniversitySchedule.Middlewares
 {
@@ -6,11 +8,13 @@ namespace UniversitySchedule.Middlewares
     {
         private readonly RequestDelegate _next;
         private readonly ILogger<GlobalExceptionMiddleware> _logger;
+        private readonly IHostEnvironment _env;
 
-        public GlobalExceptionMiddleware(RequestDelegate next, ILogger<GlobalExceptionMiddleware> logger)
+        public GlobalExceptionMiddleware(RequestDelegate _next, ILogger<GlobalExceptionMiddleware> logger, IHostEnvironment env)
         {
-            _next = next;
+            this._next = _next;
             _logger = logger;
+            _env = env;
         }
 
         public async Task InvokeAsync(HttpContext context)
@@ -21,46 +25,44 @@ namespace UniversitySchedule.Middlewares
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unhandled exception occurred: {Message}", ex.Message);
+                _logger.LogError(ex, "An unhandled exception occurred: {Message}", ex.Message);
                 await HandleExceptionAsync(context, ex);
             }
         }
 
-        private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
+        private async Task HandleExceptionAsync(HttpContext context, Exception exception)
         {
             context.Response.ContentType = "application/json";
 
-            var statusCode = exception switch
+            // 1. Map the exception to our ErrorType and Status Code
+            var (errorType, statusCode) = exception switch
             {
-                KeyNotFoundException => 404,
-                ArgumentException => 400,
-                InvalidOperationException => 400,
-                _ => 500 // Unknown/unexpected errors
+                UnauthorizedAccessException => (ErrorType.Unauthorized, (int)HttpStatusCode.Unauthorized),
+                KeyNotFoundException => (ErrorType.NotFound, (int)HttpStatusCode.NotFound),
+                ArgumentException => (ErrorType.Validation, (int)HttpStatusCode.BadRequest),
+                _ => (ErrorType.Failure, (int)HttpStatusCode.InternalServerError)
             };
 
-            var message = statusCode switch
-            {
-                400 => "Bad Request",
-                404 => "Resource not found",
-                500 => "An unexpected error occurred",
-                _ => "An error occurred"
-            };
-
-            // Customize message in production vs development
-            var errorMessage = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development"
+            // 2. Determine the message (hide details in Production)
+            string message = _env.IsDevelopment()
                 ? exception.Message
-                : message;
+                : "An unexpected error occurred on the server.";
 
+            // 3. Use the same structure as our ResultFilter
+            // We manually create the payload to ensure it matches the "shaped" response
             var response = new
             {
-                success = false,
-                message = errorMessage,
-                errors = new[] { errorMessage },
-                statusCode
+                IsSuccess = false,
+                Message = message,
+                Errors = _env.IsDevelopment() ? new List<string> { exception.StackTrace ?? "" } : new List<string> { "Internal Server Error" },
+                Data = (object?)null
             };
 
             context.Response.StatusCode = statusCode;
-            await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+
+            // 4. Serialize with CamelCase to match standard JSON conventions
+            var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+            await context.Response.WriteAsync(JsonSerializer.Serialize(response, options));
         }
     }
 }

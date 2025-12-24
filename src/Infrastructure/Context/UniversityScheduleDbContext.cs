@@ -1,10 +1,11 @@
-﻿using Domain.Entities;
+﻿using Application.Interfaces;
+using Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection;
 
 namespace Infrastructure.Context
 {
-    public class UniversityScheduleDbContext : DbContext
+    public class UniversityScheduleDbContext : DbContext, IDbContext
     {
         public UniversityScheduleDbContext(DbContextOptions<UniversityScheduleDbContext> options)
             : base(options)

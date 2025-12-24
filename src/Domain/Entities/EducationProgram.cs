@@ -3,6 +3,7 @@
     public class EducationProgram : BaseEntity
     {
         public string Code { get; set; } = null!;
+        public string Name { get; set; } = null!;
         public int StructureId { get; set; }
         public int? ParentId { get; set; }
 

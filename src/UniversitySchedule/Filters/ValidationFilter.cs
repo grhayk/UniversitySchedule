@@ -1,4 +1,5 @@
 ﻿using Application.Core;
+using Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 
@@ -8,22 +9,26 @@ namespace UniversitySchedule.Filters
     {
         public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
         {
-            // If ModelState is invalid (e.g., from FluentValidation), short-circuit
+            // 1. Check if the model state is invalid
             if (!context.ModelState.IsValid)
             {
+                // 2. Extract all error messages into a flat list
                 var errors = context.ModelState
-                    .Where(x => x.Value?.Errors.Any() == true)
+                    .Where(x => x.Value?.Errors.Count > 0)
                     .SelectMany(x => x.Value!.Errors)
                     .Select(x => x.ErrorMessage)
                     .ToList();
 
-                var result = Result.Failure(400, "Validation failed", errors);
+                // 3. Create our standardized Result failure
+                var result = Result.Failure(ErrorType.Validation, "Validation failed", errors);
 
-                // Return as ObjectResult so ResultFilter can format it
-                context.Result = new ObjectResult(result) { StatusCode = 400 };
+                // 4. Short-circuit the request. 
+                // This bypasses the Controller and goes straight to your ResultFilter.
+                context.Result = new BadRequestObjectResult(result);
                 return;
             }
 
+            // 5. If everything is fine, proceed to the controller action
             await next();
         }
     }

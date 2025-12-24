@@ -1,12 +1,10 @@
-using Application.Core;
-using Domain.Interfaces;
-using FluentValidation;
-using FluentValidation.AspNetCore;
+using Application;
+using Infrastructure;
 using Infrastructure.Context;
-using Infrastructure.Implementations;
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.OpenApi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using System.Threading.RateLimiting;
@@ -14,6 +12,13 @@ using UniversitySchedule.Filters;
 using UniversitySchedule.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
+
+//Configure swagger
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "UniversitySchedule API", Version = "v1" });
+});
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
@@ -68,13 +73,9 @@ builder.Services.AddControllers(options =>
     options.Filters.Add<ResultFilter>(); // apply to all controllers
 });
 
-builder.Services.AddFluentValidationAutoValidation(); // auto-validate on model binding
-builder.Services.AddFluentValidationClientsideAdapters(); // Optional (for Blazor/Razor)
-builder.Services.AddValidatorsFromAssembly(typeof(Result).Assembly);
+builder.Services.AddApplicationServices().AddInfrastructureServices();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
-builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
    .AddNegotiate();
 
@@ -96,9 +97,14 @@ app.UseSerilogRequestLogging(); // Should be after routing to capture endpoint i
 app.UseRateLimiter(); // Needs routing to resolve endpoint
 app.UseAuthorization();
 
-app.MapGet("/throw", (hc) => throw new Exception("Boom!"));
 app.MapHealthChecks("/health");
-if (app.Environment.IsDevelopment()) app.MapOpenApi();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
 app.MapControllers();
 
 app.Run();

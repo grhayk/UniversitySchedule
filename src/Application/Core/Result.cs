@@ -1,29 +1,48 @@
-﻿namespace Application.Core
+﻿using Domain.Enums;
+
+namespace Application.Core
 {
     public class Result
     {
-        public bool IsSuccess { get; private set; }
-        public string Message { get; private set; } = string.Empty;
-        public List<string> Errors { get; private set; } = new();
-        public int StatusCode { get; private set; }
+        public bool IsSuccess { get; }
+        public string Message { get; }
+        public List<string> Errors { get; }
+        public ErrorType ErrorType { get; }
 
-        protected Result() { }
+        protected Result(bool isSuccess, string message, ErrorType errorType, List<string>? errors = null)
+        {
+            IsSuccess = isSuccess;
+            Message = message;
+            ErrorType = errorType;
+            Errors = errors ?? new();
+        }
 
-        public static Result Success(string message = "Success") =>
-            new() { IsSuccess = true, Message = message, StatusCode = 200 };
+        // Helper to allow the filter to access Data without knowing the T type
+        public virtual object? GetValue() => null;
 
-        public static Result<T> Success<T>(T data, string message = "Success") =>
-            new() { IsSuccess = true, Data = data, Message = message, StatusCode = 200 };
+        public static Result Success(string message = "Success")
+            => new(true, message, ErrorType.None);
 
-        public static Result Failure(int statusCode, string message, IEnumerable<string>? errors = null) =>
-            new() { IsSuccess = false, StatusCode = statusCode, Message = message, Errors = errors?.ToList() ?? new() };
+        public static Result<T> Success<T>(T data, string message = "Success")
+            => new(data, true, message, ErrorType.None);
 
-        public static Result<T> Failure<T>(int statusCode, string message, IEnumerable<string>? errors = null) =>
-            new() { IsSuccess = false, StatusCode = statusCode, Message = message, Errors = errors?.ToList() ?? new() };
+        public static Result Failure(ErrorType errorType, string message, List<string>? errors = null)
+            => new(false, message, errorType, errors);
+
+        public static Result<T> Failure<T>(ErrorType errorType, string message, List<string>? errors = null)
+            => new(default, false, message, errorType, errors);
     }
 
     public class Result<T> : Result
     {
-        public T? Data { get; set; }
+        public T? Data { get; }
+        public override object? GetValue() => Data;
+
+        // Internal constructor to ensure it's created via the static methods
+        internal Result(T? data, bool isSuccess, string message, ErrorType errorType, List<string>? errors = null)
+            : base(isSuccess, message, errorType, errors)
+        {
+            Data = data;
+        }
     }
 }
