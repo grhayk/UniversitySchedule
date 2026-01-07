@@ -16,7 +16,7 @@ namespace Application.Features.EducationPrograms.CreateEducationProgram
     {
         public CreateEducationProgramValidator()
         {
-            RuleFor(x => x.Code).NotEmpty().MaximumLength(20);
+            RuleFor(x => x.Code).NotEmpty().MaximumLength(50);
             RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
             RuleFor(x => x.StructureId).GreaterThan(0);
             RuleFor(x => x.ParentId).GreaterThan(0).When(x => x.ParentId.HasValue);

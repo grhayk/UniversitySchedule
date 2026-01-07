@@ -39,10 +39,10 @@ namespace UniversitySchedule.Controllers
         }
 
         /// <summary>
-        /// Get all education programs with optional filtering
+        /// Get all education programs with optional filtering and pagination
         /// </summary>
         [HttpGet("GetAll")]
-        public async Task<Result<List<EducationProgramDto>>> GetAll([FromQuery] GetAllEducationProgramsQuery query)
+        public async Task<Result<PagedResult<EducationProgramDto>>> GetAll([FromQuery] GetAllEducationProgramsQuery query)
         {
             return await _mediator.Send(query);
         }

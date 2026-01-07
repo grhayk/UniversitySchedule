@@ -1,4 +1,5 @@
 ﻿using Domain.Enums;
+using System.Text.Json.Serialization;
 
 namespace Application.Core
 {
@@ -7,6 +8,9 @@ namespace Application.Core
         public bool IsSuccess { get; }
         public string Message { get; }
         public List<string> Errors { get; }
+
+        // Internal - used for status code mapping, not exposed in JSON
+        [JsonIgnore]
         public ErrorType ErrorType { get; }
 
         protected Result(bool isSuccess, string message, ErrorType errorType, List<string>? errors = null)

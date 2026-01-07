@@ -6,7 +6,8 @@
         Validation = 1,
         NotFound = 2,
         Unauthorized = 3,
-        Conflict = 4,
-        Failure = 5
+        Forbidden = 4,
+        Conflict = 5,
+        Failure = 6
     }
 }

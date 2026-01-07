@@ -26,10 +26,9 @@ Log.Logger = new LoggerConfiguration()
     .Enrich.WithSpan() // Adds tracing/span information
     .WriteTo.Console()
     .WriteTo.File("logs/app.txt", rollingInterval: RollingInterval.Day)
-    .Enrich.FromLogContext()
     .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
     .MinimumLevel.Override("System", Serilog.Events.LogEventLevel.Warning)
-    .CreateBootstrapLogger(); // Allows logging during startup
+    .CreateBootstrapLogger();
 
 builder.Host.UseSerilog(); // Plug into ASP.NET Core logging
 
@@ -69,7 +68,6 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddControllers(options =>
 {
-    options.Filters.Add<ValidationFilter>();
     options.Filters.Add<ResultFilter>(); // apply to all controllers
 });
 
