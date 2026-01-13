@@ -15,7 +15,7 @@ namespace Domain.Entities
         /// Gets or sets the parent group ID for hierarchical relationships.
         /// </summary>
         /// <remarks>
-        /// Null if this is a main group. Non-null for subgroups (e.g., lecture group, practical group).
+        /// Null if this is a main group (those are the lecture groups). Non-null for subgroups (e.g., lab group, practical group).
         /// </remarks>
         public int? ParentId { get; set; }
 
