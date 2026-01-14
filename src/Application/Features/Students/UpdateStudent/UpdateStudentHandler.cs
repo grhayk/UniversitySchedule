@@ -1,5 +1,6 @@
 using Application.Core;
 using Application.Interfaces;
+using Domain.Entities;
 using Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -35,6 +36,14 @@ namespace Application.Features.Students.UpdateStudent
                 return Result.Failure(ErrorType.NotFound, $"Group with ID {request.GroupId} not found.");
             }
 
+            // Group must be a parent group (lecture group)
+            if (group.ParentId != null)
+            {
+                return Result.Failure(ErrorType.Validation, "Student can only be assigned to a parent group (lecture group).");
+            }
+
+            var oldGroupId = student.GroupId;
+
             student.FirstName = request.FirstName;
             student.LastName = request.LastName;
             student.BirthDate = request.BirthDate;
@@ -43,6 +52,27 @@ namespace Application.Features.Students.UpdateStudent
             student.StructureId = group.EducationProgram.StructureId;
             student.EducationDegree = group.Semester.EducationDegree;
             student.EducationType = group.Semester.EducationType;
+
+            // If group changed, update StudentGroup records
+            if (oldGroupId != request.GroupId)
+            {
+                // Remove all existing StudentGroup records for this student
+                var existingStudentGroups = await _context.StudentGroups
+                    .Where(sg => sg.StudentId == request.Id)
+                    .ToListAsync(ct);
+
+                _context.StudentGroups.RemoveRange(existingStudentGroups);
+
+                // Create new StudentGroup for the new parent group
+                var studentGroup = new StudentGroup
+                {
+                    StudentId = request.Id,
+                    GroupId = request.GroupId,
+                    SemesterId = group.SemesterId
+                };
+
+                _context.StudentGroups.Add(studentGroup);
+            }
 
             await _context.SaveChangesAsync(ct);
 

@@ -24,6 +24,7 @@ namespace Application.Features.Students.BulkUpload
         {
             var result = new BulkUploadResult();
             var studentsToAdd = new List<Student>();
+            var studentGroupsToAdd = new List<StudentGroup>();
 
             try
             {
@@ -33,7 +34,7 @@ namespace Application.Features.Students.BulkUpload
                 csv.Context.RegisterClassMap<CsvStudentMap>();
                 var csvRecords = csv.GetRecords<CsvStudentRecord>().ToList();
 
-                // Get groups with their related data for deriving fields
+                // Get groups with their related data for deriving fields (only parent groups)
                 var groupIds = csvRecords.Select(r => r.GroupId).Distinct().ToList();
                 var groups = await _dbContext.Groups
                     .Include(g => g.EducationProgram)
@@ -69,6 +70,19 @@ namespace Application.Features.Students.BulkUpload
                         continue;
                     }
 
+                    // Group must be a parent group (lecture group)
+                    if (group.ParentId != null)
+                    {
+                        result.Errors.Add(new BulkUploadError
+                        {
+                            RowNumber = rowNumber,
+                            Message = "Student can only be assigned to a parent group (lecture group)",
+                            Code = $"{record.FirstName} {record.LastName}"
+                        });
+                        result.FailureCount++;
+                        continue;
+                    }
+
                     var student = new Student
                     {
                         FirstName = record.FirstName,
@@ -81,13 +95,23 @@ namespace Application.Features.Students.BulkUpload
                         EducationType = group.Semester.EducationType
                     };
 
+                    // Also create StudentGroup record
+                    var studentGroup = new StudentGroup
+                    {
+                        Student = student,
+                        GroupId = record.GroupId,
+                        SemesterId = group.SemesterId
+                    };
+
                     studentsToAdd.Add(student);
+                    studentGroupsToAdd.Add(studentGroup);
                     result.SuccessCount++;
                 }
 
                 if (studentsToAdd.Any())
                 {
                     await _dbContext.Students.AddRangeAsync(studentsToAdd, ct);
+                    await _dbContext.StudentGroups.AddRangeAsync(studentGroupsToAdd, ct);
                     await _dbContext.SaveChangesAsync(ct);
                 }
 

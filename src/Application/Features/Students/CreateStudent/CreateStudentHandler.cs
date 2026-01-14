@@ -29,6 +29,12 @@ namespace Application.Features.Students.CreateStudent
                 return Result.Failure<int>(ErrorType.NotFound, $"Group with ID {request.GroupId} not found.");
             }
 
+            // Group must be a parent group (lecture group)
+            if (group.ParentId != null)
+            {
+                return Result.Failure<int>(ErrorType.Validation, "Student can only be assigned to a parent group (lecture group).");
+            }
+
             var student = new Student
             {
                 FirstName = request.FirstName,
@@ -42,6 +48,16 @@ namespace Application.Features.Students.CreateStudent
             };
 
             _context.Students.Add(student);
+
+            // Also create StudentGroup record for the parent group
+            var studentGroup = new StudentGroup
+            {
+                Student = student,
+                GroupId = request.GroupId,
+                SemesterId = group.SemesterId
+            };
+
+            _context.StudentGroups.Add(studentGroup);
             await _context.SaveChangesAsync(ct);
 
             return Result.Success(student.Id, "Student created successfully");
