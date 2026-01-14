@@ -1,7 +1,6 @@
 using Application.Core;
 using Application.Interfaces;
 using AutoMapper;
-using Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
