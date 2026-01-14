@@ -3,7 +3,11 @@
 ##
 ## Get latest from `dotnet new gitignore`
 
+# Claude Code artifacts
+nul
+tmp*-cwd*
 .claude
+
 # dotenv files
 .env
 
