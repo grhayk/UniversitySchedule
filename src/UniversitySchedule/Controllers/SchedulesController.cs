@@ -3,6 +3,7 @@ using Application.Features.Schedules;
 using Application.Features.Schedules.BulkUpload;
 using Application.Features.Schedules.CreateSchedule;
 using Application.Features.Schedules.DeleteSchedule;
+using Application.Features.Schedules.GenerateSchedule;
 using Application.Features.Schedules.GetScheduleById;
 using Application.Features.Schedules.GetSchedulesByGroup;
 using Application.Features.Schedules.GetSchedulesBySemester;
@@ -132,6 +133,18 @@ namespace UniversitySchedule.Controllers
         }
 
         /// <summary>
+        /// Generate schedule for all active groups using CP-SAT solver
+        /// </summary>
+        [HttpPost("generate")]
+        public async Task<Result<GenerateScheduleResult>> Generate([FromBody] GenerateScheduleRequest request)
+        {
+            return await _mediator.Send(new GenerateScheduleCommand
+            {
+                StartDate = request.StartDate
+            });
+        }
+
+        /// <summary>
         /// Bulk upload schedules from CSV file
         /// </summary>
         /// <remarks>
@@ -186,5 +199,10 @@ namespace UniversitySchedule.Controllers
         public int SemesterId { get; init; }
         public int? ScheduleParentId { get; init; }
         public List<int> GroupIds { get; init; } = new();
+    }
+
+    public record GenerateScheduleRequest
+    {
+        public DateTime StartDate { get; init; }
     }
 }
