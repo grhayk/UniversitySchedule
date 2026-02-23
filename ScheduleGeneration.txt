@@ -49,8 +49,8 @@ For each GroupSubjectWithLecturer, we resolve:
   - LecturerId, SubjectId     — from LecturerSubject
   - Hours                     — from SubjectConfig (for that Subject + LessonType)
   - BusyGroupIds              — which groups become "busy" when this lesson runs
-  - ValidClassroomIds          — which classrooms can host this (filtered by
-                                 SubjectClassroom + seat capacity >= student count)
+  - ValidClassroomIds          — which classrooms can host this (see below)
+  - PreferredClassroomIds     — same-building classrooms (subset of valid)
   - ScheduleGroupIds          — which groups to attach to the Schedule entity
   - SemesterId                — from the group
 
@@ -58,6 +58,23 @@ BusyGroupIds logic (prevents group conflicts):
   - Parent group lecture:  parent + ALL children are busy
   - Child group practical: child + parent are busy
   - Flow:                  all flow groups + all their children are busy
+
+Classroom selection logic:
+  Case A — Subject IS in SubjectClassroom table:
+    → Use only those classrooms, filtered by seat capacity >= student count.
+    → No building preference (SubjectClassroom entries are already curated).
+
+  Case B — Subject is NOT in SubjectClassroom table:
+    → These are "general" subjects that can use any university-level classroom.
+    → Valid = all classrooms where Structure.ParentId == null (belongs to
+      university directly), filtered by capacity.
+    → Preferred = subset of valid classrooms in the same building as the
+      group's chair. The building is determined by:
+        Group → EducationProgram → Structure (the chair) → ClassroomId
+        → Classroom.Building (byte indicating building number).
+    → The building preference is a SOFT CONSTRAINT (penalty=2 per event
+      placed in a non-preferred building). This tries to minimize students
+      walking between buildings, but doesn't make the problem infeasible.
 
 If any demand has 0 valid classrooms, we fail early with an error.
 
@@ -143,6 +160,13 @@ AVOID LATE SLOTS
   Slot 4 (5th pair): penalty = 1
   Slot 5 (6th pair): penalty = 3
   The solver minimizes the total penalty, preferring earlier timeslots.
+
+PREFER SAME BUILDING
+  For events where PreferredClassroomIds is set (subjects not in
+  SubjectClassroom), penalty = 2 if the chosen classroom is NOT in the
+  preferred (same-building) set.
+  This encourages the solver to keep groups in their building, but
+  allows other buildings if necessary.
 
 --- SOLVING ---
 

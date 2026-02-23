@@ -39,7 +39,14 @@ namespace Domain.Entities
         /// </summary>
         public DateTime? ToDate { get; set; }
 
+        /// <summary>
+        /// Gets or sets the classroom ID that represents this structure's room (e.g., chair's office).
+        /// Used to determine the building number for the structure.
+        /// </summary>
+        public int? ClassroomId { get; set; }
+
         // Relationships
+        public Classroom? Classroom { get; set; }
         public Structure? Parent { get; set; }
         public ICollection<Structure> Children { get; set; } = new List<Structure>();
 

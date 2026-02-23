@@ -178,6 +178,33 @@ namespace Infrastructure.Services
 
             var penalties = new List<IntVar>();
 
+            // Penalty for non-preferred building (soft constraint)
+            for (int e = 0; e < events.Count; e++)
+            {
+                var demand = demands[events[e].DemandIndex];
+                var preferred = demand.PreferredClassroomIds;
+                if (preferred.Count == 0 || preferred.Count == demand.ValidClassroomIds.Count)
+                    continue; // No preference or all are preferred — skip
+
+                // isPreferred[e] = true if classroom is in PreferredClassroomIds
+                var isPreferred = model.NewBoolVar($"pref_{e}");
+                var preferredSet = new HashSet<int>(preferred);
+                var validCr = demand.ValidClassroomIds;
+
+                // Map classroomIndex to whether it's preferred using allowed assignments
+                var prefTable = model.AddAllowedAssignments(new[] { classroomIndexVars[e], isPreferred });
+                for (int j = 0; j < validCr.Count; j++)
+                {
+                    prefTable.AddTuple(new long[] { j, preferredSet.Contains(validCr[j]) ? 1 : 0 });
+                }
+
+                // Penalty of 2 for non-preferred building
+                var buildingPen = model.NewIntVar(0, 2, $"bpen_{e}");
+                model.Add(buildingPen == 2).OnlyEnforceIf(isPreferred.Not());
+                model.Add(buildingPen == 0).OnlyEnforceIf(isPreferred);
+                penalties.Add(buildingPen);
+            }
+
             // Penalty for late slots (slot 4 = small penalty, slot 5 = larger)
             for (int e = 0; e < events.Count; e++)
             {

@@ -28,7 +28,9 @@ namespace Application.Features.Schedules.GenerateSchedule
                 .Include(g => g.LecturerSubject).ThenInclude(ls => ls.Subject).ThenInclude(s => s.SubjectConfigs)
                 .Include(g => g.Group).ThenInclude(g => g!.Children)
                 .Include(g => g.Group).ThenInclude(g => g!.Parent)
+                .Include(g => g.Group).ThenInclude(g => g!.EducationProgram).ThenInclude(ep => ep.Structure).ThenInclude(s => s.Classroom)
                 .Include(g => g.Flow).ThenInclude(f => f!.FlowGroups).ThenInclude(fg => fg.Group).ThenInclude(g => g.Children)
+                .Include(g => g.Flow).ThenInclude(f => f!.FlowGroups).ThenInclude(fg => fg.Group).ThenInclude(g => g.EducationProgram).ThenInclude(ep => ep.Structure).ThenInclude(s => s.Classroom)
                 .Where(g =>
                     (g.GroupId.HasValue && g.Group!.IsActive) ||
                     (g.FlowId.HasValue && g.Flow!.IsActive))
@@ -45,6 +47,7 @@ namespace Application.Features.Schedules.GenerateSchedule
 
             var classrooms = await _context.Classrooms
                 .Include(c => c.Characteristics)
+                .Include(c => c.Structure)
                 .AsNoTracking()
                 .ToListAsync(ct);
 
@@ -142,13 +145,66 @@ namespace Application.Features.Schedules.GenerateSchedule
                     }
                 }
 
-                // Valid classrooms: SubjectClassroom filtered by capacity
-                var validClassroomIds = subjectClassrooms
+                // Valid classrooms selection
+                var scEntries = subjectClassrooms
                     .Where(sc => sc.SubjectId == subjectId && sc.LessonType == gswl.LessonType)
                     .Select(sc => sc.ClassroomId)
-                    .Where(cId => classroomCapacity.GetValueOrDefault(cId, 0) >= studentCount)
                     .Distinct()
                     .ToList();
+
+                List<int> validClassroomIds;
+                List<int> preferredClassroomIds = new();
+
+                if (scEntries.Count > 0)
+                {
+                    // Subject has explicit classroom assignments — use only those
+                    validClassroomIds = scEntries
+                        .Where(cId => classroomCapacity.GetValueOrDefault(cId, 0) >= studentCount)
+                        .ToList();
+                }
+                else
+                {
+                    // Subject not in SubjectClassroom — find by building, then university-level
+                    // Determine the group's building via Group → EducationProgram → Structure → Classroom
+                    byte? groupBuilding = null;
+                    if (gswl.GroupId.HasValue)
+                    {
+                        var group = gswl.Group!;
+                        // Use parent group's ed program for child groups
+                        var edProgGroup = group.ParentId.HasValue && group.Parent?.EducationProgram != null
+                            ? group.Parent
+                            : group;
+                        groupBuilding = edProgGroup.EducationProgram?.Structure?.Classroom?.Building;
+                    }
+                    else if (gswl.FlowId.HasValue)
+                    {
+                        // For flows, take building from the first flow group that has it
+                        groupBuilding = gswl.Flow!.FlowGroups
+                            .Select(fg => fg.Group.EducationProgram?.Structure?.Classroom?.Building)
+                            .FirstOrDefault(b => b.HasValue);
+                    }
+
+                    // Same-building classrooms (university-level, i.e. Structure.ParentId == null)
+                    var sameBuildingIds = groupBuilding.HasValue
+                        ? classrooms
+                            .Where(c => c.Building == groupBuilding.Value
+                                        && c.Structure.ParentId == null
+                                        && classroomCapacity.GetValueOrDefault(c.Id, 0) >= studentCount)
+                            .Select(c => c.Id)
+                            .ToList()
+                        : new List<int>();
+
+                    // University-level classrooms (any building)
+                    var universityClassroomIds = classrooms
+                        .Where(c => c.Structure.ParentId == null
+                                    && classroomCapacity.GetValueOrDefault(c.Id, 0) >= studentCount)
+                        .Select(c => c.Id)
+                        .ToList();
+
+                    // Combine: same-building + rest of university classrooms
+                    validClassroomIds = universityClassroomIds;
+                    preferredClassroomIds = sameBuildingIds;
+                }
 
                 if (validClassroomIds.Count == 0)
                 {
@@ -166,6 +222,7 @@ namespace Application.Features.Schedules.GenerateSchedule
                     Hours = subjectConfig.Hours,
                     BusyGroupIds = busyGroupIds.ToList(),
                     ValidClassroomIds = validClassroomIds,
+                    PreferredClassroomIds = preferredClassroomIds,
                     StudentCount = studentCount,
                     ScheduleGroupIds = scheduleGroupIds,
                     SemesterId = semesterId

@@ -8,6 +8,11 @@
         public string Name { get; set; } = null!;
 
         /// <summary>
+        /// Gets or sets the building number this classroom is located in.
+        /// </summary>
+        public byte Building { get; set; }
+
+        /// <summary>
         /// Gets or sets the structure this classroom belongs to.
         /// </summary>
         public int StructureId { get; set; }

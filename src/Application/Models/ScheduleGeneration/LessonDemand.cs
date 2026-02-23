@@ -20,9 +20,16 @@ namespace Application.Models.ScheduleGeneration
         public List<int> BusyGroupIds { get; init; } = new();
 
         /// <summary>
-        /// Valid classroom IDs from SubjectClassroom filtered by SeatCapacity.
+        /// Valid classroom IDs filtered by SeatCapacity.
+        /// From SubjectClassroom if exists, otherwise same-building + university-level classrooms.
         /// </summary>
         public List<int> ValidClassroomIds { get; init; } = new();
+
+        /// <summary>
+        /// Preferred classroom IDs (same building as the group's chair).
+        /// Subset of ValidClassroomIds. Empty if from SubjectClassroom or no building info.
+        /// </summary>
+        public List<int> PreferredClassroomIds { get; init; } = new();
 
         /// <summary>
         /// Student count for capacity checking.
