@@ -2,6 +2,7 @@ using Application.Core;
 using Application.Features.GroupSubjectsWithLecturer;
 using Application.Features.GroupSubjectsWithLecturer.AssignLecturerSubjectToGroup;
 using Application.Features.GroupSubjectsWithLecturer.BulkUpload;
+using Application.Features.GroupSubjectsWithLecturer.GetByFlow;
 using Application.Features.GroupSubjectsWithLecturer.GetByGroup;
 using Application.Features.GroupSubjectsWithLecturer.GetByLecturerSubject;
 using Application.Features.GroupSubjectsWithLecturer.RemoveGroupSubjectWithLecturer;
@@ -24,15 +25,28 @@ namespace UniversitySchedule.Controllers
         /// Assign a lecturer-subject to a group with a specific lesson type
         /// </summary>
         [HttpPost("groups/{groupId}/lecturer-subjects")]
-        public async Task<Result<int>> AssignLecturerSubjectToGroup(int groupId, [FromBody] AssignLecturerSubjectToGroupRequest request)
+        public async Task<Result<int>> AssignToGroup(int groupId, [FromBody] AssignLecturerSubjectRequest request)
         {
-            var command = new AssignLecturerSubjectToGroupCommand
+            return await _mediator.Send(new AssignLecturerSubjectToGroupCommand
             {
                 GroupId = groupId,
                 LecturerSubjectId = request.LecturerSubjectId,
                 LessonType = request.LessonType
-            };
-            return await _mediator.Send(command);
+            });
+        }
+
+        /// <summary>
+        /// Assign a lecturer-subject to a flow with a specific lesson type
+        /// </summary>
+        [HttpPost("flows/{flowId}/lecturer-subjects")]
+        public async Task<Result<int>> AssignToFlow(int flowId, [FromBody] AssignLecturerSubjectRequest request)
+        {
+            return await _mediator.Send(new AssignLecturerSubjectToGroupCommand
+            {
+                FlowId = flowId,
+                LecturerSubjectId = request.LecturerSubjectId,
+                LessonType = request.LessonType
+            });
         }
 
         /// <summary>
@@ -49,7 +63,20 @@ namespace UniversitySchedule.Controllers
         }
 
         /// <summary>
-        /// Get all groups assigned to a lecturer-subject
+        /// Get all lecturer-subjects assigned to a flow
+        /// </summary>
+        [HttpGet("flows/{flowId}/lecturer-subjects")]
+        public async Task<Result<List<GroupLecturerSubjectListDto>>> GetByFlow(int flowId, [FromQuery] LessonType? lessonType)
+        {
+            return await _mediator.Send(new GetByFlowQuery
+            {
+                FlowId = flowId,
+                LessonType = lessonType
+            });
+        }
+
+        /// <summary>
+        /// Get all groups/flows assigned to a lecturer-subject
         /// </summary>
         [HttpGet("lecturer-subjects/{lecturerSubjectId}/groups")]
         public async Task<Result<List<LecturerSubjectGroupListDto>>> GetByLecturerSubject(int lecturerSubjectId, [FromQuery] LessonType? lessonType)
@@ -62,7 +89,7 @@ namespace UniversitySchedule.Controllers
         }
 
         /// <summary>
-        /// Remove a group-subject-lecturer assignment
+        /// Remove a group/flow-subject-lecturer assignment
         /// </summary>
         [HttpDelete("group-subjects-with-lecturer/{id}")]
         public async Task<Result> Remove(int id)
@@ -95,7 +122,7 @@ namespace UniversitySchedule.Controllers
         }
     }
 
-    public record AssignLecturerSubjectToGroupRequest
+    public record AssignLecturerSubjectRequest
     {
         public int LecturerSubjectId { get; init; }
         public LessonType LessonType { get; init; }

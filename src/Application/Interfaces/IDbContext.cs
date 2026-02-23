@@ -23,6 +23,8 @@ namespace Application.Interfaces
         DbSet<EducationProgramSubject> EducationProgramSubjects { get; }
         DbSet<SubjectConfig> SubjectConfigs { get; }
         DbSet<SubjectClassroom> SubjectClassrooms { get; }
+        DbSet<Flow> Flows { get; }
+        DbSet<FlowGroup> FlowGroups { get; }
 
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
     }

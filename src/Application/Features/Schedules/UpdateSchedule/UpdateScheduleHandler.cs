@@ -102,8 +102,9 @@ namespace Application.Features.Schedules.UpdateSchedule
             var groupSubjectsWithLecturer = await _context.GroupSubjectsWithLecturer
                 .Where(gsl => gsl.LecturerSubjectId == lecturerSubject.Id
                            && gsl.LessonType == request.LessonType
-                           && request.GroupIds.Contains(gsl.GroupId))
-                .Select(gsl => gsl.GroupId)
+                           && gsl.GroupId.HasValue
+                           && request.GroupIds.Contains(gsl.GroupId!.Value))
+                .Select(gsl => gsl.GroupId!.Value)
                 .ToListAsync(ct);
 
             var groupsWithoutAssignment = request.GroupIds.Except(groupSubjectsWithLecturer).ToList();

@@ -31,6 +31,8 @@ namespace Infrastructure.Context
         public DbSet<EducationProgramSubject> EducationProgramSubjects => Set<EducationProgramSubject>();
         public DbSet<SubjectConfig> SubjectConfigs => Set<SubjectConfig>();
         public DbSet<SubjectClassroom> SubjectClassrooms => Set<SubjectClassroom>();
+        public DbSet<Flow> Flows => Set<Flow>();
+        public DbSet<FlowGroup> FlowGroups => Set<FlowGroup>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

@@ -26,17 +26,11 @@ namespace Application.Features.GroupSubjectsWithLecturer.AssignLecturerSubjectTo
 
             if (lecturerSubject is null)
             {
-                return Result.Failure<int>(ErrorType.NotFound, $"LecturerSubject with ID {request.LecturerSubjectId} not found.");
+                return Result.Failure<int>(ErrorType.NotFound,
+                    $"LecturerSubject with ID {request.LecturerSubjectId} not found.");
             }
 
-            // Validate group exists
-            var groupExists = await _context.Groups.AnyAsync(g => g.Id == request.GroupId, ct);
-            if (!groupExists)
-            {
-                return Result.Failure<int>(ErrorType.NotFound, $"Group with ID {request.GroupId} not found.");
-            }
-
-            // Check if Subject has this LessonType configured and get the Hours
+            // Validate Subject has this LessonType configured and get the Hours
             var subjectConfig = lecturerSubject.Subject.SubjectConfigs
                 .FirstOrDefault(c => c.LessonType == request.LessonType);
 
@@ -46,30 +40,78 @@ namespace Application.Features.GroupSubjectsWithLecturer.AssignLecturerSubjectTo
                     $"Subject does not have {request.LessonType} configured in its SubjectConfigs.");
             }
 
-            // Check for duplicate
-            var duplicateExists = await _context.GroupSubjectsWithLecturer
-                .AnyAsync(g => g.LecturerSubjectId == request.LecturerSubjectId
-                            && g.GroupId == request.GroupId
-                            && g.LessonType == request.LessonType, ct);
-
-            if (duplicateExists)
+            if (request.GroupId.HasValue)
             {
-                return Result.Failure<int>(ErrorType.Conflict,
-                    $"This LecturerSubject is already assigned to group {request.GroupId} for {request.LessonType}.");
+                // Validate group exists
+                var groupExists = await _context.Groups.AnyAsync(g => g.Id == request.GroupId.Value, ct);
+                if (!groupExists)
+                {
+                    return Result.Failure<int>(ErrorType.NotFound,
+                        $"Group with ID {request.GroupId} not found.");
+                }
+
+                // Check for duplicate
+                var duplicateExists = await _context.GroupSubjectsWithLecturer
+                    .AnyAsync(g => g.LecturerSubjectId == request.LecturerSubjectId
+                                && g.GroupId == request.GroupId
+                                && g.LessonType == request.LessonType, ct);
+
+                if (duplicateExists)
+                {
+                    return Result.Failure<int>(ErrorType.Conflict,
+                        $"This LecturerSubject is already assigned to Group {request.GroupId} for {request.LessonType}.");
+                }
+            }
+            else
+            {
+                // Validate flow exists and its Subject/LessonType match
+                var flow = await _context.Flows
+                    .FirstOrDefaultAsync(f => f.Id == request.FlowId!.Value, ct);
+
+                if (flow is null)
+                {
+                    return Result.Failure<int>(ErrorType.NotFound,
+                        $"Flow with ID {request.FlowId} not found.");
+                }
+
+                if (flow.SubjectId != lecturerSubject.SubjectId)
+                {
+                    return Result.Failure<int>(ErrorType.Validation,
+                        $"Flow's Subject ({flow.SubjectId}) does not match the LecturerSubject's Subject ({lecturerSubject.SubjectId}).");
+                }
+
+                if (flow.LessonType != request.LessonType)
+                {
+                    return Result.Failure<int>(ErrorType.Validation,
+                        $"Flow's LessonType ({flow.LessonType}) does not match the requested LessonType ({request.LessonType}).");
+                }
+
+                // Check for duplicate
+                var duplicateExists = await _context.GroupSubjectsWithLecturer
+                    .AnyAsync(g => g.LecturerSubjectId == request.LecturerSubjectId
+                                && g.FlowId == request.FlowId
+                                && g.LessonType == request.LessonType, ct);
+
+                if (duplicateExists)
+                {
+                    return Result.Failure<int>(ErrorType.Conflict,
+                        $"This LecturerSubject is already assigned to Flow {request.FlowId} for {request.LessonType}.");
+                }
             }
 
             var groupSubjectWithLecturer = new GroupSubjectWithLecturer
             {
                 LecturerSubjectId = request.LecturerSubjectId,
                 GroupId = request.GroupId,
+                FlowId = request.FlowId,
                 LessonType = request.LessonType,
-                Hours = subjectConfig.Hours // Hours derived from SubjectConfig
+                Hours = subjectConfig.Hours
             };
 
             _context.GroupSubjectsWithLecturer.Add(groupSubjectWithLecturer);
             await _context.SaveChangesAsync(ct);
 
-            return Result.Success(groupSubjectWithLecturer.Id, "Lecturer-Subject assigned to group successfully");
+            return Result.Success(groupSubjectWithLecturer.Id, "Lecturer-Subject assigned successfully.");
         }
     }
 }

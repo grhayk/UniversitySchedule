@@ -74,7 +74,7 @@ namespace Application.Features.Schedules.BulkUpload
 
                 // Load GroupSubjectsWithLecturer
                 var groupSubjectsWithLecturer = await _context.GroupSubjectsWithLecturer
-                    .Where(gsl => allGroupIds.Contains(gsl.GroupId))
+                    .Where(gsl => gsl.GroupId.HasValue && allGroupIds.Contains(gsl.GroupId!.Value))
                     .Include(gsl => gsl.LecturerSubject)
                     .ToListAsync(ct);
 
@@ -204,7 +204,7 @@ namespace Application.Features.Schedules.BulkUpload
                     // Validate GroupSubjectWithLecturer for each group
                     var groupsWithoutAssignment = groupIds.Where(gId =>
                         !groupSubjectsWithLecturer.Any(gsl =>
-                            gsl.GroupId == gId &&
+                            gsl.GroupId == gId &&  // int? == int is fine in C# (implicit lift)
                             gsl.LecturerSubjectId == lecturerSubject.Id &&
                             gsl.LessonType == record.LessonType)).ToList();
 
