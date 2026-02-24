@@ -5,6 +5,7 @@ using Domain.Entities;
 using Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
 
 namespace Application.Features.Schedules.GenerateSchedule
 {
@@ -21,9 +22,12 @@ namespace Application.Features.Schedules.GenerateSchedule
 
         public async Task<Result<GenerateScheduleResult>> Handle(GenerateScheduleCommand request, CancellationToken ct)
         {
-            // Step 1: Load all necessary data
+            var totalSw = Stopwatch.StartNew();
+            var stepSw = Stopwatch.StartNew();
 
-            // All active GroupSubjectWithLecturer with related data
+            // Step 1: Load all necessary data
+            Console.WriteLine("[Step 1] Loading data from DB...");
+
             var gswls = await _context.GroupSubjectsWithLecturer
                 .Include(g => g.LecturerSubject).ThenInclude(ls => ls.Subject).ThenInclude(s => s.SubjectConfigs)
                 .Include(g => g.Group).ThenInclude(g => g!.Children)
@@ -37,19 +41,25 @@ namespace Application.Features.Schedules.GenerateSchedule
                 .AsNoTracking()
                 .ToListAsync(ct);
 
+            Console.WriteLine($"  Loaded {gswls.Count} GSWL records ({stepSw.ElapsedMilliseconds}ms)");
+
             if (!gswls.Any())
             {
                 return Result.Failure<GenerateScheduleResult>(ErrorType.Validation,
                     "No active GroupSubjectWithLecturer records found.");
             }
 
+            stepSw.Restart();
             var subjectClassrooms = await _context.SubjectClassrooms.AsNoTracking().ToListAsync(ct);
+            Console.WriteLine($"  Loaded {subjectClassrooms.Count} SubjectClassroom records ({stepSw.ElapsedMilliseconds}ms)");
 
+            stepSw.Restart();
             var classrooms = await _context.Classrooms
                 .Include(c => c.Characteristics)
                 .Include(c => c.Structure)
                 .AsNoTracking()
                 .ToListAsync(ct);
+            Console.WriteLine($"  Loaded {classrooms.Count} Classrooms ({stepSw.ElapsedMilliseconds}ms)");
 
             var timeTables = await _context.TimeTables
                 .OrderBy(t => t.StartTime)
@@ -62,19 +72,23 @@ namespace Application.Features.Schedules.GenerateSchedule
                     $"Expected at least 6 TimeTables, found {timeTables.Count}.");
             }
 
-            // Build classroom capacity lookup
             var classroomCapacity = classrooms
                 .Where(c => c.Characteristics != null)
                 .ToDictionary(c => c.Id, c => c.Characteristics!.SeatCapacity);
 
-            // Build student count per parent group (sum students from group's Students)
+            stepSw.Restart();
             var studentCountByGroup = await _context.Students
                 .Where(s => s.GroupId.HasValue)
                 .GroupBy(s => s.GroupId!.Value)
                 .Select(g => new { GroupId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.GroupId, x => x.Count, ct);
+            Console.WriteLine($"  Loaded student counts for {studentCountByGroup.Count} groups ({stepSw.ElapsedMilliseconds}ms)");
+            Console.WriteLine($"[Step 1] Done ({totalSw.ElapsedMilliseconds}ms total)");
 
             // Step 2: Build LessonDemand list
+            Console.WriteLine("[Step 2] Building demands...");
+            stepSw.Restart();
+
             var demands = new List<LessonDemand>();
             var errors = new List<string>();
 
@@ -83,12 +97,11 @@ namespace Application.Features.Schedules.GenerateSchedule
                 var lecturerId = gswl.LecturerSubject.LecturerId;
                 var subjectId = gswl.LecturerSubject.SubjectId;
 
-                // Get hours from SubjectConfig
                 var subjectConfig = gswl.LecturerSubject.Subject.SubjectConfigs
                     .FirstOrDefault(sc => sc.LessonType == gswl.LessonType);
 
                 if (subjectConfig is null || subjectConfig.Hours == 0)
-                    continue; // No hours configured for this lesson type, skip
+                    continue;
 
                 var busyGroupIds = new HashSet<int>();
                 var scheduleGroupIds = new List<int>();
@@ -103,25 +116,21 @@ namespace Application.Features.Schedules.GenerateSchedule
 
                     if (gswl.LessonType == LessonType.Lecture)
                     {
-                        // Parent group lecture: parent + all children are busy
                         busyGroupIds.Add(group.Id);
                         foreach (var child in group.Children)
                             busyGroupIds.Add(child.Id);
                     }
                     else
                     {
-                        // Child group practical/lab: child + parent are busy
                         busyGroupIds.Add(group.Id);
                         if (group.ParentId.HasValue)
                             busyGroupIds.Add(group.ParentId.Value);
                     }
 
-                    // Student count: for lectures sum children, for practicals/labs use child's count
                     if (gswl.LessonType == LessonType.Lecture && group.Children.Any())
                     {
                         studentCount = group.Children
                             .Sum(c => studentCountByGroup.GetValueOrDefault(c.Id, 0));
-                        // Also include students directly on parent group
                         studentCount += studentCountByGroup.GetValueOrDefault(group.Id, 0);
                     }
                     else
@@ -131,7 +140,6 @@ namespace Application.Features.Schedules.GenerateSchedule
                 }
                 else
                 {
-                    // Flow
                     var flow = gswl.Flow!;
                     studentCount = flow.StudentsCount;
                     semesterId = flow.SemesterId;
@@ -157,16 +165,12 @@ namespace Application.Features.Schedules.GenerateSchedule
 
                 if (scEntries.Count > 0)
                 {
-                    // Subject has explicit classroom assignments — use only those
                     validClassroomIds = scEntries
                         .Where(cId => classroomCapacity.GetValueOrDefault(cId, 0) >= studentCount)
                         .ToList();
                 }
                 else
                 {
-                    // Subject not in SubjectClassroom — find by building, then university-level
-                    // Determine the group's building via chair's ChairRoom classroom
-                    // Group → EducationProgram → StructureId (chair) → Classroom with Type=ChairRoom → Building
                     byte? groupBuilding = null;
                     int? chairId = null;
 
@@ -186,14 +190,12 @@ namespace Application.Features.Schedules.GenerateSchedule
 
                     if (chairId.HasValue)
                     {
-                        // Find the chair's room (ClassroomType.ChairRoom = 8) to get building
                         groupBuilding = classrooms
                             .FirstOrDefault(c => c.StructureId == chairId.Value
                                                  && c.Characteristics?.Type == ClassroomType.ChairRoom)
                             ?.Building;
                     }
 
-                    // Same-building classrooms (university-level, i.e. Structure.ParentId == null)
                     var sameBuildingIds = groupBuilding.HasValue
                         ? classrooms
                             .Where(c => c.Building == groupBuilding.Value
@@ -203,14 +205,12 @@ namespace Application.Features.Schedules.GenerateSchedule
                             .ToList()
                         : new List<int>();
 
-                    // University-level classrooms (any building)
                     var universityClassroomIds = classrooms
                         .Where(c => c.Structure.ParentId == null
                                     && classroomCapacity.GetValueOrDefault(c.Id, 0) >= studentCount)
                         .Select(c => c.Id)
                         .ToList();
 
-                    // Combine: same-building + rest of university classrooms
                     validClassroomIds = universityClassroomIds;
                     preferredClassroomIds = sameBuildingIds;
                 }
@@ -238,6 +238,8 @@ namespace Application.Features.Schedules.GenerateSchedule
                 });
             }
 
+            Console.WriteLine($"  Built {demands.Count} demands, {errors.Count} errors ({stepSw.ElapsedMilliseconds}ms)");
+
             if (errors.Any())
             {
                 return Result.Failure<GenerateScheduleResult>(ErrorType.Validation,
@@ -251,6 +253,9 @@ namespace Application.Features.Schedules.GenerateSchedule
             }
 
             // Step 3: Expand demands into LessonEvents
+            Console.WriteLine("[Step 3] Expanding demands into events...");
+            stepSw.Restart();
+
             var events = new List<LessonEvent>();
             for (int d = 0; d < demands.Count; d++)
             {
@@ -264,7 +269,12 @@ namespace Application.Features.Schedules.GenerateSchedule
                 }
             }
 
+            Console.WriteLine($"  {events.Count} events from {demands.Count} demands ({stepSw.ElapsedMilliseconds}ms)");
+
             // Step 4: Call solver
+            Console.WriteLine("[Step 4] Calling CP-SAT solver...");
+            stepSw.Restart();
+
             var input = new ScheduleGeneratorInput
             {
                 Demands = demands,
@@ -275,6 +285,8 @@ namespace Application.Features.Schedules.GenerateSchedule
 
             var output = _generator.Generate(input);
 
+            Console.WriteLine($"  Solver finished: {output.SolverStatus} ({stepSw.ElapsedMilliseconds}ms)");
+
             if (!output.IsFeasible)
             {
                 return Result.Failure<GenerateScheduleResult>(ErrorType.Validation,
@@ -283,6 +295,9 @@ namespace Application.Features.Schedules.GenerateSchedule
             }
 
             // Step 5: Map output to Schedule entities
+            Console.WriteLine("[Step 5] Mapping solver output to Schedule entities...");
+            stepSw.Restart();
+
             var timeTableIds = timeTables.Select(t => t.Id).ToList();
             var schedulesToCreate = new List<Schedule>();
 
@@ -317,9 +332,17 @@ namespace Application.Features.Schedules.GenerateSchedule
                 schedulesToCreate.Add(schedule);
             }
 
+            Console.WriteLine($"  Created {schedulesToCreate.Count} schedule entities ({stepSw.ElapsedMilliseconds}ms)");
+
             // Step 6: Save all in single transaction
+            Console.WriteLine("[Step 6] Saving to database...");
+            stepSw.Restart();
+
             await _context.Schedules.AddRangeAsync(schedulesToCreate, ct);
             await _context.SaveChangesAsync(ct);
+
+            Console.WriteLine($"  Saved ({stepSw.ElapsedMilliseconds}ms)");
+            Console.WriteLine($"[DONE] Total time: {totalSw.Elapsed.TotalSeconds:F2}s");
 
             return Result.Success(new GenerateScheduleResult
             {
