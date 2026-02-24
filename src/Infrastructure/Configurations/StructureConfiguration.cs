@@ -13,11 +13,6 @@ namespace Infrastructure.Configurations
             builder.Property(x => x.Code).IsRequired().HasMaxLength(50);
             builder.Property(x => x.Type).HasConversion<byte>();
 
-            builder.HasOne(x => x.Classroom)
-                .WithMany()
-                .HasForeignKey(x => x.ClassroomId)
-                .OnDelete(DeleteBehavior.SetNull);
-
             builder.HasOne(x => x.Parent)
                 .WithMany(x => x.Children)
                 .HasForeignKey(x => x.ParentId)

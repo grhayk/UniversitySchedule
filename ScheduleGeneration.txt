@@ -70,7 +70,8 @@ Classroom selection logic:
       university directly), filtered by capacity.
     → Preferred = subset of valid classrooms in the same building as the
       group's chair. The building is determined by:
-        Group → EducationProgram → Structure (the chair) → ClassroomId
+        Group → EducationProgram → StructureId (the chair)
+        → find Classroom where StructureId=chairId AND Type=ChairRoom
         → Classroom.Building (byte indicating building number).
     → The building preference is a SOFT CONSTRAINT (penalty=2 per event
       placed in a non-preferred building). This tries to minimize students

@@ -28,9 +28,9 @@ namespace Application.Features.Schedules.GenerateSchedule
                 .Include(g => g.LecturerSubject).ThenInclude(ls => ls.Subject).ThenInclude(s => s.SubjectConfigs)
                 .Include(g => g.Group).ThenInclude(g => g!.Children)
                 .Include(g => g.Group).ThenInclude(g => g!.Parent)
-                .Include(g => g.Group).ThenInclude(g => g!.EducationProgram).ThenInclude(ep => ep.Structure).ThenInclude(s => s.Classroom)
+                .Include(g => g.Group).ThenInclude(g => g!.EducationProgram)
                 .Include(g => g.Flow).ThenInclude(f => f!.FlowGroups).ThenInclude(fg => fg.Group).ThenInclude(g => g.Children)
-                .Include(g => g.Flow).ThenInclude(f => f!.FlowGroups).ThenInclude(fg => fg.Group).ThenInclude(g => g.EducationProgram).ThenInclude(ep => ep.Structure).ThenInclude(s => s.Classroom)
+                .Include(g => g.Flow).ThenInclude(f => f!.FlowGroups).ThenInclude(fg => fg.Group).ThenInclude(g => g.EducationProgram)
                 .Where(g =>
                     (g.GroupId.HasValue && g.Group!.IsActive) ||
                     (g.FlowId.HasValue && g.Flow!.IsActive))
@@ -165,23 +165,32 @@ namespace Application.Features.Schedules.GenerateSchedule
                 else
                 {
                     // Subject not in SubjectClassroom — find by building, then university-level
-                    // Determine the group's building via Group → EducationProgram → Structure → Classroom
+                    // Determine the group's building via chair's ChairRoom classroom
+                    // Group → EducationProgram → StructureId (chair) → Classroom with Type=ChairRoom → Building
                     byte? groupBuilding = null;
+                    int? chairId = null;
+
                     if (gswl.GroupId.HasValue)
                     {
                         var group = gswl.Group!;
-                        // Use parent group's ed program for child groups
-                        var edProgGroup = group.ParentId.HasValue && group.Parent?.EducationProgram != null
-                            ? group.Parent
-                            : group;
-                        groupBuilding = edProgGroup.EducationProgram?.Structure?.Classroom?.Building;
+                        chairId = group.ParentId.HasValue && group.Parent?.EducationProgram != null
+                            ? group.Parent.EducationProgram.StructureId
+                            : group.EducationProgram?.StructureId;
                     }
                     else if (gswl.FlowId.HasValue)
                     {
-                        // For flows, take building from the first flow group that has it
-                        groupBuilding = gswl.Flow!.FlowGroups
-                            .Select(fg => fg.Group.EducationProgram?.Structure?.Classroom?.Building)
-                            .FirstOrDefault(b => b.HasValue);
+                        chairId = gswl.Flow!.FlowGroups
+                            .Select(fg => fg.Group.EducationProgram?.StructureId)
+                            .FirstOrDefault(id => id.HasValue);
+                    }
+
+                    if (chairId.HasValue)
+                    {
+                        // Find the chair's room (ClassroomType.ChairRoom = 8) to get building
+                        groupBuilding = classrooms
+                            .FirstOrDefault(c => c.StructureId == chairId.Value
+                                                 && c.Characteristics?.Type == ClassroomType.ChairRoom)
+                            ?.Building;
                     }
 
                     // Same-building classrooms (university-level, i.e. Structure.ParentId == null)
