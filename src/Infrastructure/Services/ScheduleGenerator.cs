@@ -119,7 +119,7 @@ namespace Infrastructure.Services
             Console.WriteLine($"    Hours distribution done ({sw.ElapsedMilliseconds}ms)");
 
             // NOTE: Timeslot capacity handled by Phase 1.5 greedy repair (not in CP-SAT model).
-            // NOTE: No-same-day and late-slot penalties removed for performance.
+            // NOTE: No-windows / late-slot penalties handled in Phase 3 post-processing.
 
             Console.WriteLine($"    Model complete ({sw.ElapsedMilliseconds}ms). Solving...");
 
@@ -396,12 +396,9 @@ namespace Infrastructure.Services
 
             if (failedEvents.Count > 0)
             {
-                // Log details about failures
                 var failedByTimeslot = failedEvents.GroupBy(e => timeslotAssignments[e]);
                 foreach (var g in failedByTimeslot.Take(5))
-                {
-                    Console.WriteLine($"    Timeslot {g.Key}: {g.Count()} events couldn't get a classroom (slot has {eventsByTimeslot[g.Key].Count} events)");
-                }
+                    Console.WriteLine($"    Timeslot {g.Key}: {g.Count()} events couldn't get a classroom");
 
                 return new ScheduleGeneratorOutput
                 {
@@ -411,6 +408,188 @@ namespace Infrastructure.Services
             }
 
             Console.WriteLine($"  [Phase 2] Done ({sw.ElapsedMilliseconds}ms)");
+
+            // =================================================================
+            // PHASE 3: Gap compaction (no-windows soft optimization)
+            // For each busy group, check each day for gaps between lessons.
+            // Try to move events to adjacent slots to make the schedule contiguous.
+            // =================================================================
+            Console.WriteLine($"  [Phase 3] Gap compaction (no-windows)...");
+
+            // Build full conflict/usage data structures for move validation
+            var lecSlots3 = new Dictionary<int, HashSet<int>>();
+            var grpSlots3 = new Dictionary<int, HashSet<int>>();
+            var crUsage3 = new Dictionary<int, HashSet<int>>(); // timeslot -> used classroom IDs
+
+            for (int e = 0; e < events.Count; e++)
+            {
+                var dem = demands[events[e].DemandIndex];
+                int ts = timeslotAssignments[e];
+
+                if (!lecSlots3.TryGetValue(dem.LecturerId, out var ls3))
+                    lecSlots3[dem.LecturerId] = ls3 = new HashSet<int>();
+                ls3.Add(ts);
+
+                foreach (var gId in dem.BusyGroupIds)
+                {
+                    if (!grpSlots3.TryGetValue(gId, out var gs3))
+                        grpSlots3[gId] = gs3 = new HashSet<int>();
+                    gs3.Add(ts);
+                }
+
+                if (!crUsage3.TryGetValue(ts, out var cu3))
+                    crUsage3[ts] = cu3 = new HashSet<int>();
+                cu3.Add(classroomAssignments[e]);
+            }
+
+            // For each busy group, find gaps on each day and try to compact
+            int totalGapsBefore = 0;
+            int totalGapsAfter = 0;
+            int compactMoves = 0;
+
+            // Build: busy group -> list of event indices
+            var grpEvents3 = new Dictionary<int, List<int>>();
+            for (int e = 0; e < events.Count; e++)
+            {
+                var dem = demands[events[e].DemandIndex];
+                foreach (var gId in dem.BusyGroupIds)
+                {
+                    if (!grpEvents3.TryGetValue(gId, out var geList))
+                        grpEvents3[gId] = geList = new List<int>();
+                    geList.Add(e);
+                }
+            }
+
+            // Process each busy group
+            foreach (var (gId, gEvents) in grpEvents3)
+            {
+                // Group events by day (dayIndex = timeslot / slotsPerDay)
+                var byDay = new Dictionary<int, List<int>>();
+                foreach (int e in gEvents)
+                {
+                    int day = timeslotAssignments[e] / slotsPerDay;
+                    if (!byDay.TryGetValue(day, out var dayList))
+                        byDay[day] = dayList = new List<int>();
+                    dayList.Add(e);
+                }
+
+                foreach (var (day, dayEvents) in byDay)
+                {
+                    if (dayEvents.Count < 2) continue;
+
+                    // Get slots used on this day
+                    var slots = dayEvents.Select(e => timeslotAssignments[e] % slotsPerDay).OrderBy(s => s).ToList();
+                    int gap = slots[^1] - slots[0] - slots.Count + 1;
+                    totalGapsBefore += gap;
+
+                    if (gap == 0) continue; // already contiguous
+
+                    // Try to compact: move events with gaps toward the median slot
+                    int dayBase = day * slotsPerDay;
+                    int medianSlot = slots[slots.Count / 2];
+
+                    // Sort events: farthest from median first
+                    var sortedByDist = dayEvents
+                        .OrderByDescending(e => Math.Abs((timeslotAssignments[e] % slotsPerDay) - medianSlot))
+                        .ToList();
+
+                    foreach (int e in sortedByDist)
+                    {
+                        int currentSlot = timeslotAssignments[e] % slotsPerDay;
+                        int direction = currentSlot > medianSlot ? -1 : (currentSlot < medianSlot ? 1 : 0);
+                        if (direction == 0) continue;
+
+                        // Try to move one slot toward median
+                        int targetSlotInDay = currentSlot + direction;
+                        if (targetSlotInDay < 0 || targetSlotInDay >= slotsPerDay) continue;
+
+                        int targetTs = dayBase + targetSlotInDay;
+                        int oldTs = timeslotAssignments[e];
+                        if (targetTs == oldTs) continue;
+
+                        var dem = demands[events[e].DemandIndex];
+
+                        // Check lecturer conflict
+                        if (lecSlots3.TryGetValue(dem.LecturerId, out var lts3) && lts3.Contains(targetTs))
+                            continue;
+
+                        // Check group conflicts
+                        bool conflict = false;
+                        foreach (var bgId in dem.BusyGroupIds)
+                        {
+                            if (grpSlots3.TryGetValue(bgId, out var gts3) && gts3.Contains(targetTs))
+                            { conflict = true; break; }
+                        }
+                        if (conflict) continue;
+
+                        // Check classroom: is current classroom free at target timeslot?
+                        int crId = classroomAssignments[e];
+                        var usedAtTarget = crUsage3.GetValueOrDefault(targetTs);
+                        if (usedAtTarget != null && usedAtTarget.Contains(crId))
+                        {
+                            // Try to find another valid classroom at target timeslot
+                            int? altCr = null;
+                            foreach (var vcr in dem.ValidClassroomIds)
+                            {
+                                if (usedAtTarget == null || !usedAtTarget.Contains(vcr))
+                                { altCr = vcr; break; }
+                            }
+                            if (!altCr.HasValue) continue;
+                            crId = altCr.Value;
+                        }
+
+                        // Move is valid — execute it
+                        // Update lecturer slots
+                        bool otherLecAtOld = false;
+                        foreach (int oe in gEvents)
+                        {
+                            if (oe != e && timeslotAssignments[oe] == oldTs &&
+                                demands[events[oe].DemandIndex].LecturerId == dem.LecturerId)
+                            { otherLecAtOld = true; break; }
+                        }
+                        lecSlots3[dem.LecturerId].Add(targetTs);
+                        if (!otherLecAtOld) lecSlots3[dem.LecturerId].Remove(oldTs);
+
+                        // Update group slots
+                        foreach (var bgId in dem.BusyGroupIds)
+                        {
+                            grpSlots3[bgId].Add(targetTs);
+                            // Check if any other event of this group is at oldTs
+                            bool otherAtOld = false;
+                            if (grpEvents3.TryGetValue(bgId, out var bgEvents))
+                            {
+                                foreach (int oe in bgEvents)
+                                {
+                                    if (oe != e && timeslotAssignments[oe] == oldTs)
+                                    { otherAtOld = true; break; }
+                                }
+                            }
+                            if (!otherAtOld) grpSlots3[bgId].Remove(oldTs);
+                        }
+
+                        // Update classroom usage
+                        if (!crUsage3.TryGetValue(targetTs, out var cuTarget))
+                            crUsage3[targetTs] = cuTarget = new HashSet<int>();
+                        cuTarget.Add(crId);
+
+                        var cuOld = crUsage3.GetValueOrDefault(oldTs);
+                        if (cuOld != null) cuOld.Remove(classroomAssignments[e]);
+
+                        // Apply move
+                        timeslotAssignments[e] = targetTs;
+                        classroomAssignments[e] = crId;
+                        compactMoves++;
+                    }
+
+                    // Recalculate gap
+                    var newSlots = dayEvents.Select(e => timeslotAssignments[e] % slotsPerDay).OrderBy(s => s).ToList();
+                    int newGap = newSlots[^1] - newSlots[0] - newSlots.Count + 1;
+                    totalGapsAfter += newGap;
+                }
+            }
+
+            Console.WriteLine($"    Compaction moves: {compactMoves}, gaps: {totalGapsBefore} -> {totalGapsAfter}");
+            Console.WriteLine($"  [Phase 3] Done ({sw.ElapsedMilliseconds}ms)");
 
             // =================================================================
             // BUILD OUTPUT
@@ -434,6 +613,7 @@ namespace Infrastructure.Services
                 SolverStatus = status.ToString()
             };
         }
+
     }
 
     internal class SolverProgressCallback : CpSolverSolutionCallback

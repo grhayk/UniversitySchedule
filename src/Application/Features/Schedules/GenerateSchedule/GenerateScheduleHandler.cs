@@ -165,9 +165,22 @@ namespace Application.Features.Schedules.GenerateSchedule
 
                 if (scEntries.Count > 0)
                 {
-                    validClassroomIds = scEntries
+                    var scValid = scEntries
                         .Where(cId => classroomCapacity.GetValueOrDefault(cId, 0) >= studentCount)
                         .ToList();
+
+                    // SubjectClassroom entries become preferred; also include all
+                    // university-level classrooms with sufficient capacity as fallback.
+                    // This prevents infeasibility when too many events share too few
+                    // SubjectClassroom entries (e.g., 124 events for 2 classrooms = 120 max slots).
+                    var universityFallback = classrooms
+                        .Where(c => c.Structure.ParentId == null
+                                    && classroomCapacity.GetValueOrDefault(c.Id, 0) >= studentCount)
+                        .Select(c => c.Id)
+                        .ToList();
+
+                    preferredClassroomIds = scValid;
+                    validClassroomIds = universityFallback.Union(scValid).ToList();
                 }
                 else
                 {
