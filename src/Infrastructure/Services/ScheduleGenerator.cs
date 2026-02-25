@@ -1,6 +1,7 @@
 using Application.Interfaces;
 using Application.Models.ScheduleGeneration;
 using Google.OrTools.Sat;
+using SatDomain = Google.OrTools.Util.Domain;
 using System.Diagnostics;
 
 namespace Infrastructure.Services
@@ -35,10 +36,50 @@ namespace Infrastructure.Services
             var model = new CpModel();
             var timeslotVars = new IntVar[events.Count];
 
-            for (int e = 0; e < events.Count; e++)
-                timeslotVars[e] = model.NewIntVar(0, totalTimeslots - 1, $"ts_{e}");
+            // Build timeslot domains that avoid late slots (5th/6th pairs)
+            // Slots 0-3 per day = "early" (40 timeslots), slot 4 = "mid" (+10 = 50), slot 5 = "late" (+10 = 60)
+            // Events only get expanded domains if their lecturer or group NEEDS that many unique timeslots
+            var earlyTs = new List<long>();
+            var midTs = new List<long>();
+            for (int t = 0; t < totalTimeslots; t++)
+            {
+                int slotInDay = t % slotsPerDay;
+                if (slotInDay <= 3) earlyTs.Add(t);
+                else if (slotInDay == 4) midTs.Add(t);
+            }
 
-            Console.WriteLine($"    Variables: {events.Count} ({sw.ElapsedMilliseconds}ms)");
+            var earlyDomain = SatDomain.FromValues(earlyTs.ToArray());                          // 40 slots
+            var midDomain = SatDomain.FromValues(earlyTs.Concat(midTs).ToArray());               // 50 slots
+            var fullDomain = SatDomain.FromFlatIntervals(new long[] { 0, totalTimeslots - 1 });  // 60 slots
+
+            // Count events per lecturer and per busy group to determine who needs more room
+            var eventsPerLecturer = new Dictionary<int, int>();
+            var eventsPerGroup = new Dictionary<int, int>();
+            for (int e = 0; e < events.Count; e++)
+            {
+                var dem = demands[events[e].DemandIndex];
+                eventsPerLecturer[dem.LecturerId] = eventsPerLecturer.GetValueOrDefault(dem.LecturerId) + 1;
+                foreach (var gId in dem.BusyGroupIds)
+                    eventsPerGroup[gId] = eventsPerGroup.GetValueOrDefault(gId) + 1;
+            }
+
+            int earlyCount = 0, midCount = 0, fullCount = 0;
+            for (int e = 0; e < events.Count; e++)
+            {
+                var dem = demands[events[e].DemandIndex];
+                int maxNeeded = eventsPerLecturer.GetValueOrDefault(dem.LecturerId, 0);
+                foreach (var gId in dem.BusyGroupIds)
+                    maxNeeded = Math.Max(maxNeeded, eventsPerGroup.GetValueOrDefault(gId, 0));
+
+                SatDomain domain;
+                if (maxNeeded <= earlyTs.Count) { domain = earlyDomain; earlyCount++; }
+                else if (maxNeeded <= earlyTs.Count + midTs.Count) { domain = midDomain; midCount++; }
+                else { domain = fullDomain; fullCount++; }
+
+                timeslotVars[e] = model.NewIntVarFromDomain(domain, $"ts_{e}");
+            }
+
+            Console.WriteLine($"    Variables: {events.Count} (early:{earlyCount}, mid:{midCount}, full:{fullCount}) ({sw.ElapsedMilliseconds}ms)");
 
             // HARD: Lecturer no-overlap
             var eventsByLecturer = events
@@ -144,12 +185,18 @@ namespace Infrastructure.Services
                 };
             }
 
-            // Extract timeslot assignments
+            // Extract timeslot assignments and count late slots
             var timeslotAssignments = new int[events.Count];
+            int slot5Count = 0, slot6Count = 0;
             for (int e = 0; e < events.Count; e++)
+            {
                 timeslotAssignments[e] = (int)solver.Value(timeslotVars[e]);
+                int slotInDay = timeslotAssignments[e] % slotsPerDay;
+                if (slotInDay == 4) slot5Count++;
+                if (slotInDay == 5) slot6Count++;
+            }
 
-            Console.WriteLine($"  [Phase 1] Done ({sw.ElapsedMilliseconds}ms)");
+            Console.WriteLine($"  [Phase 1] Done ({sw.ElapsedMilliseconds}ms), 5th pair: {slot5Count}, 6th pair: {slot6Count} (of {events.Count})");
 
             // =================================================================
             // PHASE 1.5: Repair over-capacity timeslots
