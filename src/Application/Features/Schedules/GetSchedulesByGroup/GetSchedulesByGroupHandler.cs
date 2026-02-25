@@ -29,14 +29,13 @@ namespace Application.Features.Schedules.GetSchedulesByGroup
                     $"Group with ID {request.GroupId} not found.");
             }
 
-            var query = _context.ScheduleGroups
-                .Where(sg => sg.GroupId == request.GroupId)
-                .Select(sg => sg.Schedule)
+            var query = _context.Schedules
                 .Include(s => s.Subject)
                 .Include(s => s.TimeTable)
                 .Include(s => s.Classroom)
                 .Include(s => s.Lecturer)
                 .Include(s => s.ScheduleGroups)
+                .Where(s => s.ScheduleGroups.Any(sg => sg.GroupId == request.GroupId))
                 .AsQueryable();
 
             if (request.DateFrom.HasValue)

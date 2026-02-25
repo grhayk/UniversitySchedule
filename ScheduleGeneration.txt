@@ -2,12 +2,16 @@
               SCHEDULE GENERATION — HOW IT WORKS
 ================================================================================
 
-The goal: take all GroupSubjectWithLecturer records and automatically produce
-a conflict-free 2-week schedule (numerator + denominator) for the entire
-university.
+OVERVIEW
+--------
+The system automatically generates a conflict-free university schedule for all
+active groups across a 2-week cycle (numerator + denominator weeks). It places
+every lesson into a specific timeslot and classroom, ensuring no student,
+lecturer, or classroom is double-booked.
 
-This is an NP-hard constraint satisfaction problem. We use Google OR-Tools
-CP-SAT solver to find a solution.
+This is an NP-hard constraint satisfaction problem. We solve it using a
+combination of Google OR-Tools CP-SAT solver (for the hard part) and greedy
+algorithms (for the rest).
 
 
 ================================================================================
@@ -19,7 +23,7 @@ The handler does 6 steps:
   Step 1 — Load data from DB
   Step 2 — Build a list of "demands" (what needs to be scheduled)
   Step 3 — Expand demands into individual "events" (lesson slots)
-  Step 4 — Call the CP-SAT solver
+  Step 4 — Call the solver (4 phases inside)
   Step 5 — Map solver output back to Schedule entities
   Step 6 — Save everything to DB
 
@@ -31,7 +35,7 @@ The handler does 6 steps:
 We load:
   - All active GroupSubjectWithLecturer records (with Subject, SubjectConfigs,
     Group hierarchy, Flow and FlowGroups)
-  - All SubjectClassroom records (which classrooms are valid for which subject)
+  - All SubjectClassroom records (which classrooms are preferred for subjects)
   - All Classrooms with their Characteristics (seat capacity)
   - All TimeTables ordered by start time (to map slot index -> TimeTableId)
   - Student counts per group (to check classroom capacity)
@@ -49,8 +53,8 @@ For each GroupSubjectWithLecturer, we resolve:
   - LecturerId, SubjectId     — from LecturerSubject
   - Hours                     — from SubjectConfig (for that Subject + LessonType)
   - BusyGroupIds              — which groups become "busy" when this lesson runs
-  - ValidClassroomIds          — which classrooms can host this (see below)
-  - PreferredClassroomIds     — same-building classrooms (subset of valid)
+  - ValidClassroomIds         — which classrooms can host this lesson
+  - PreferredClassroomIds     — SubjectClassroom entries (tried first)
   - ScheduleGroupIds          — which groups to attach to the Schedule entity
   - SemesterId                — from the group
 
@@ -59,25 +63,14 @@ BusyGroupIds logic (prevents group conflicts):
   - Child group practical: child + parent are busy
   - Flow:                  all flow groups + all their children are busy
 
-Classroom selection logic:
-  Case A — Subject IS in SubjectClassroom table:
-    → Use only those classrooms, filtered by seat capacity >= student count.
-    → No building preference (SubjectClassroom entries are already curated).
-
-  Case B — Subject is NOT in SubjectClassroom table:
-    → These are "general" subjects that can use any university-level classroom.
-    → Valid = all classrooms where Structure.ParentId == null (belongs to
-      university directly), filtered by capacity.
-    → Preferred = subset of valid classrooms in the same building as the
-      group's chair. The building is determined by:
-        Group → EducationProgram → StructureId (the chair)
-        → find Classroom where StructureId=chairId AND Type=ChairRoom
-        → Classroom.Building (byte indicating building number).
-    → The building preference is a SOFT CONSTRAINT (penalty=2 per event
-      placed in a non-preferred building). This tries to minimize students
-      walking between buildings, but doesn't make the problem infeasible.
-
-If any demand has 0 valid classrooms, we fail early with an error.
+Classroom selection:
+  - ValidClassroomIds = ALL university-level classrooms (Structure.ParentId == null)
+    with seat capacity >= student count. This ensures every event has many options.
+  - PreferredClassroomIds = either SubjectClassroom entries (if they exist for
+    this subject+lessonType) or same-building classrooms (determined by the
+    group's chair -> ChairRoom classroom -> building number).
+  - Preferred classrooms are tried first during assignment but any valid
+    classroom can be used as fallback. This prevents infeasibility.
 
 
 ================================================================================
@@ -88,14 +81,14 @@ Each demand with Hours = H creates H individual "LessonEvent" objects.
 For example, a demand with Hours = 3 creates 3 events.
 
 Each event is a single lesson slot that needs to be placed somewhere in the
-2-week grid.
+2-week grid. Example: 4746 demands -> 6631 events.
 
 
 ================================================================================
 5. THE TIME GRID
 ================================================================================
 
-  2 weeks × 5 days × 6 slots = 60 total timeslots
+  2 weeks x 5 days x 6 slots = 60 total timeslots
 
   Timeslot encoding:
     timeslot = weekIndex * 30 + dayIndex * 6 + slotIndex
@@ -105,90 +98,147 @@ Each event is a single lesson slot that needs to be placed somewhere in the
     slotIndex: 0 = 1st pair ... 5 = 6th pair
 
   Example: timeslot 37 = week 1, day 1, slot 1
-           → denominator week, Tuesday, 2nd pair
+           = denominator week, Tuesday, 2nd pair
 
 
 ================================================================================
-6. STEP 4: THE CP-SAT SOLVER (ScheduleGenerator.cs)
+6. WHY SEPARATE PHASES?
 ================================================================================
 
-This is the core algorithm. It takes the demands + events and finds a valid
-assignment of (timeslot, classroom) to each event.
+Putting everything into one solver model (timeslots + classrooms together)
+creates too many variables. With 6631 events x 300 classrooms, the model
+grows to 21GB+ memory and never finishes.
 
---- VARIABLES ---
+Instead, we split into 4 phases:
+  Phase 1   — CP-SAT solver assigns TIMESLOTS only (the hard part)
+  Phase 1.5 — Greedy repair fixes over-crowded timeslots
+  Phase 2   — Greedy algorithm assigns CLASSROOMS
+  Phase 3   — Greedy compaction reduces gaps in student schedules
 
-For each event e:
-  timeslotVars[e]  — which of the 60 timeslots (IntVar, range 0-59)
-  classroomVars[e] — which classroom ID (restricted to valid ones)
-
-For classrooms, we use an index trick:
-  classroomIndexVars[e] — index into the demand's ValidClassroomIds list
-  Then an AllowedAssignments table maps index -> actual classroom ID
-  This avoids namespace conflicts and handles arbitrary classroom ID values.
-
---- HARD CONSTRAINTS (must be satisfied) ---
-
-1. CLASSROOM NO-OVERLAP
-   No two events can use the same classroom at the same time.
-   We create: combined[e] = timeslot[e] * maxClassroomId + classroom[e]
-   Then: AddAllDifferent(all combined values)
-   This encodes the (timeslot, classroom) pair as a single integer.
-
-2. LECTURER NO-OVERLAP
-   Events with the same lecturer must have different timeslots.
-   We group events by lecturer, then: AddAllDifferent(timeslots in group)
-
-3. GROUP NO-OVERLAP
-   Events that make the same group "busy" must have different timeslots.
-   We group events by each BusyGroupId, then: AddAllDifferent(timeslots)
-   This naturally handles parent-child and flow relationships.
-
-4. HOURS DISTRIBUTION
-   Events from the same demand must be split across the 2 weeks:
-     - Even hours (H=2,4): exactly H/2 in each week
-     - Odd hours (H=1,3): ceil(H/2) in one week, floor(H/2) in the other
-   We use a BoolVar isInWeek0[e] (true if timeslot < 30) and constrain
-   the sum of isInWeek0 values for each demand's events.
-
-5. NO SAME-SUBJECT SAME-DAY
-   Two events of the same demand cannot fall on the same day (across both
-   weeks). We compute dayVars[e] = timeslot / slotsPerDay (gives 0-9 for
-   10 total days) and: AddAllDifferent(dayVars for same demand)
-
---- SOFT CONSTRAINTS (objective to minimize) ---
-
-AVOID LATE SLOTS
-  Slot 4 (5th pair): penalty = 1
-  Slot 5 (6th pair): penalty = 3
-  The solver minimizes the total penalty, preferring earlier timeslots.
-
-PREFER SAME BUILDING
-  For events where PreferredClassroomIds is set (subjects not in
-  SubjectClassroom), penalty = 2 if the chosen classroom is NOT in the
-  preferred (same-building) set.
-  This encourages the solver to keep groups in their building, but
-  allows other buildings if necessary.
-
---- SOLVING ---
-
-The solver runs for up to 60 seconds. It returns either:
-  - Optimal:  best possible solution found
-  - Feasible: a valid solution (may not be the best)
-  - Infeasible / other: no valid schedule exists with current data
+This keeps the solver model small (~16K variables) and fast (~20-30 seconds).
+The greedy phases run in under 1 second.
 
 
 ================================================================================
-7. STEP 5: MAP OUTPUT TO SCHEDULE ENTITIES
+7. PHASE 1: CP-SAT SOLVER (Timeslot Assignment)
+================================================================================
+
+What is CP-SAT?
+  CP-SAT = Constraint Programming with Satisfiability. It's a solver from
+  Google's OR-Tools library. You define variables, constraints, and optionally
+  an objective function. The solver explores the search space and finds an
+  assignment of values to variables that satisfies all constraints.
+
+  Think of it like a puzzle solver: you give it the rules, and it finds a
+  solution (or proves none exists).
+
+Variables:
+  One integer variable per event: timeslot[e] in range [0, 59]
+  One boolean per event: isInWeek0[e] (true if timeslot < 30)
+  Total: ~16K variables for 6631 events
+
+Hard constraints (MUST be satisfied):
+
+  1. LECTURER NO-OVERLAP
+     Events with the same lecturer must have different timeslots.
+     For each lecturer, we group their events and add:
+       AddAllDifferent(timeslots of that lecturer's events)
+     Example: If Prof. Smith has 20 events, all 20 must be at different timeslots.
+
+  2. GROUP NO-OVERLAP
+     Events that make the same group "busy" must have different timeslots.
+     For each BusyGroupId, we group events and add:
+       AddAllDifferent(timeslots of that group's events)
+     This naturally handles parent-child and flow relationships because
+     BusyGroupIds already expanded the group hierarchy.
+
+  3. HOURS DISTRIBUTION
+     Events from the same demand must be split across the 2 weeks:
+       Even hours (H=2,4): exactly H/2 in each week
+       Odd hours (H=3): 2 in one week, 1 in the other (solver decides which)
+     We constrain the count of isInWeek0 for each demand's events.
+
+What the solver returns:
+  - Status: Optimal (best possible), Feasible (valid but maybe not best),
+    or Infeasible (impossible with current data)
+  - For each event: which timeslot (0-59) it should go to
+
+What the solver does NOT know about:
+  - Classrooms (handled in Phase 2)
+  - How many events can fit in one timeslot (handled in Phase 1.5)
+  - Gaps in student daily schedules (handled in Phase 3)
+
+
+================================================================================
+8. PHASE 1.5: CAPACITY REPAIR (Greedy)
+================================================================================
+
+Problem:
+  The solver doesn't know there are only 300 classrooms. It might put 269
+  events into one timeslot, but only ~195 can actually get classrooms (65% of
+  300, leaving headroom since not every classroom fits every event).
+
+Solution:
+  For each over-capacity timeslot, move excess events to less-crowded slots:
+  1. Find timeslots with more events than the limit (65% of classroom count)
+  2. For each excess event, find a target timeslot with room that doesn't
+     create lecturer or group conflicts
+  3. Prefer same-week targets to maintain hours distribution
+
+Uses multiple passes — moving events frees up space for more moves.
+Typically moves ~1100 events in 1 pass.
+
+
+================================================================================
+9. PHASE 2: CLASSROOM ASSIGNMENT (Greedy)
+================================================================================
+
+For each timeslot, assign classrooms to events:
+  1. Sort events by constraint level — most constrained first (fewest valid
+     classrooms). This ensures the pickiest events get first choice.
+  2. For each event, try PreferredClassroomIds first (SubjectClassroom entries
+     or same-building), then fall back to any valid classroom.
+  3. Mark classroom as used for this timeslot (no double-booking).
+
+Since every event has many valid classrooms (all university-level classrooms
+with sufficient capacity), this phase rarely fails.
+
+
+================================================================================
+10. PHASE 3: GAP COMPACTION — "No Windows" (Greedy)
+================================================================================
+
+Problem:
+  A student group might have lessons at slots 0, 2, 4 on the same day
+  (gaps at slots 1 and 3). Students prefer consecutive lessons without gaps.
+
+Solution:
+  For each group's daily schedule:
+  1. Calculate the "gap" = last_slot - first_slot - event_count + 1
+  2. Find the median slot for that day's events
+  3. Move outlier events one slot closer to the median
+  4. Before each move, validate all constraints:
+     - No lecturer conflict at the target timeslot
+     - No group conflict at the target timeslot
+     - Current classroom (or an alternative valid one) is free at target
+  5. If constraints block the move, skip it (some gaps are unavoidable)
+
+This is a soft optimization — it reduces total gaps but doesn't guarantee
+zero gaps. Typical improvement: ~10% gap reduction (e.g. 3325 -> 2989).
+
+
+================================================================================
+11. STEP 5: MAP OUTPUT TO SCHEDULE ENTITIES
 ================================================================================
 
 For each placed event, we decode the timeslot back:
-  weekIndex = timeslot / 30          → WeekType (Numerator/Denominator)
-  dayIndex  = (timeslot % 30) / 6    → added to StartDate for ScheduleDate
-  slotIndex = timeslot % 6           → mapped to TimeTableId (ordered list)
+  weekIndex = timeslot / 30          -> WeekType (Numerator/Denominator)
+  dayIndex  = (timeslot % 30) / 6   -> added to StartDate for ScheduleDate
+  slotIndex = timeslot % 6          -> mapped to TimeTableId (ordered list)
 
 We create a Schedule entity with:
   SubjectId, LecturerId, LessonTypeId  — from the demand
-  ClassroomId                          — from solver output
+  ClassroomId                          — from Phase 2 output
   TimeTableId                          — from slotIndex mapping
   WeekType                             — from weekIndex
   ScheduleDate                         — StartDate + weekIndex*7 + dayIndex
@@ -197,15 +247,15 @@ We create a Schedule entity with:
 
 
 ================================================================================
-8. STEP 6: SAVE
+12. STEP 6: SAVE
 ================================================================================
 
-All Schedule entities are saved in a single SaveChangesAsync call for
-atomicity.
+All Schedule and ScheduleGroup entities are saved in a single SaveChangesAsync
+call for atomicity. If anything fails, nothing is saved.
 
 
 ================================================================================
-9. API USAGE
+13. API USAGE
 ================================================================================
 
   POST /api/schedules/generate
@@ -217,7 +267,21 @@ atomicity.
 
 
 ================================================================================
-10. EXAMPLE FLOW
+14. TYPICAL PERFORMANCE
+================================================================================
+
+Test data: 6631 events, 4746 demands, 300 classrooms, 60 timeslots
+
+  Phase 1   (CP-SAT):      ~21 seconds
+  Phase 1.5 (repair):      < 1 second  (moves ~1100 events)
+  Phase 2   (classrooms):  < 1 second  (assigns all 6631)
+  Phase 3   (compaction):  < 1 second  (reduces ~10% of gaps)
+  DB save:                 ~4 seconds
+  Total:                   ~25 seconds
+
+
+================================================================================
+15. EXAMPLE FLOW
 ================================================================================
 
   Input data:
@@ -228,25 +292,29 @@ atomicity.
     - Prof. Jones teaches Calculus practicals
 
   Demands built:
-    D0: Calculus Lecture  for CS-201  (Hours=2, busy=[CS-201,CS-201a,CS-201b])
+    D0: Calculus Lecture   for CS-201  (Hours=2, busy=[CS-201,CS-201a,CS-201b])
     D1: Calculus Practical for CS-201a (Hours=1, busy=[CS-201a,CS-201])
     D2: Calculus Practical for CS-201b (Hours=1, busy=[CS-201b,CS-201])
 
   Events expanded:
-    E0 -> D0, E1 -> D0  (2 lecture events)
-    E2 -> D1             (1 practical event)
-    E3 -> D2             (1 practical event)
+    E0 -> D0, E1 -> D0   (2 lecture events)
+    E2 -> D1              (1 practical event)
+    E3 -> D2              (1 practical event)
 
-  Solver finds, for example:
-    E0: timeslot=0  (Mon slot1 week1), classroom=101
-    E1: timeslot=30 (Mon slot1 week2), classroom=101
-    E2: timeslot=7  (Tue slot2 week1), classroom=205
-    E3: timeslot=8  (Tue slot3 week1), classroom=205
+  Phase 1 (CP-SAT) assigns timeslots:
+    E0: timeslot=0   (Mon slot1 week1)
+    E1: timeslot=30  (Mon slot1 week2)
+    E2: timeslot=7   (Tue slot2 week1)
+    E3: timeslot=8   (Tue slot3 week1)
+
+  Phase 2 (greedy) assigns classrooms:
+    E0: classroom=101,  E1: classroom=101
+    E2: classroom=205,  E3: classroom=205
 
   No conflicts:
-    - Prof. Smith's lectures are on different timeslots (0, 30) ✓
-    - CS-201 is busy at 0,30,7,8 — all different ✓
-    - CS-201a is busy at 0,30,7 — all different ✓
-    - CS-201b is busy at 0,30,8 — all different ✓
-    - Classroom 101 used at timeslots 0 and 30 — different ✓
-    - Classroom 205 used at timeslots 7 and 8 — different ✓
+    - Prof. Smith's events at timeslots {0, 30} — all different
+    - CS-201 busy at {0, 30, 7, 8} — all different
+    - CS-201a busy at {0, 30, 7} — all different
+    - CS-201b busy at {0, 30, 8} — all different
+    - Classroom 101 at timeslots {0, 30} — all different
+    - Classroom 205 at timeslots {7, 8} — all different
