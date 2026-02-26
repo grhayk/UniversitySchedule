@@ -133,9 +133,23 @@ What is CP-SAT?
   solution (or proves none exists).
 
 Variables:
-  One integer variable per event: timeslot[e] in range [0, 59]
+  One integer variable per event: timeslot[e]
   One boolean per event: isInWeek0[e] (true if timeslot < 30)
   Total: ~16K variables for 6631 events
+
+  Domain restriction (late-slot avoidance):
+    Not all events get the full [0, 59] domain. We count how many events
+    each lecturer and each busy group has. If they fit in 40 timeslots
+    (slots 0-3 per day = 4 pairs × 5 days × 2 weeks), the domain is
+    restricted to those 40 slots — the 5th and 6th pairs are excluded.
+
+    If a lecturer/group has >40 events (needs more room), their events
+    get slot 4 too (50 timeslots). If >50, they get the full 60.
+
+    This avoids late pairs without any extra variables or objective —
+    it's just a tighter domain on existing variables.
+
+    Typical result: ~6489 events early-only, ~142 mid, 0 full.
 
 Hard constraints (MUST be satisfied):
 
@@ -183,7 +197,8 @@ Solution:
   1. Find timeslots with more events than the limit (65% of classroom count)
   2. For each excess event, find a target timeslot with room that doesn't
      create lecturer or group conflicts
-  3. Prefer same-week targets to maintain hours distribution
+  3. Target scoring prefers: same-week > early slots (1-4) > low occupancy
+     This preserves the late-slot avoidance from Phase 1.
 
 Uses multiple passes — moving events frees up space for more moves.
 Typically moves ~1100 events in 1 pass.
@@ -217,11 +232,12 @@ Solution:
   1. Calculate the "gap" = last_slot - first_slot - event_count + 1
   2. Find the median slot for that day's events
   3. Move outlier events one slot closer to the median
-  4. Before each move, validate all constraints:
+  4. Never move events INTO slots 4-5 (5th/6th pair) — preserves late-slot avoidance
+  5. Before each move, validate all constraints:
      - No lecturer conflict at the target timeslot
      - No group conflict at the target timeslot
      - Current classroom (or an alternative valid one) is free at target
-  5. If constraints block the move, skip it (some gaps are unavoidable)
+  6. If constraints block the move, skip it (some gaps are unavoidable)
 
 This is a soft optimization — it reduces total gaps but doesn't guarantee
 zero gaps. Typical improvement: ~10% gap reduction (e.g. 3325 -> 2989).
@@ -272,12 +288,15 @@ call for atomicity. If anything fails, nothing is saved.
 
 Test data: 6631 events, 4746 demands, 300 classrooms, 60 timeslots
 
-  Phase 1   (CP-SAT):      ~21 seconds
-  Phase 1.5 (repair):      < 1 second  (moves ~1100 events)
+  Phase 1   (CP-SAT):      ~36 seconds (with domain restriction)
+  Phase 1.5 (repair):      < 1 second  (moves ~1000 events)
   Phase 2   (classrooms):  < 1 second  (assigns all 6631)
   Phase 3   (compaction):  < 1 second  (reduces ~10% of gaps)
   DB save:                 ~4 seconds
-  Total:                   ~25 seconds
+  Total:                   ~40 seconds
+
+  Late-slot usage (test data): ~400 events on 5th pair, ~34 on 6th pair
+  With real data: expected near-zero on 5th/6th pairs
 
 
 ================================================================================

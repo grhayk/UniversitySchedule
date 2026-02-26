@@ -278,8 +278,7 @@ namespace Infrastructure.Services
                             bool inWeek0 = timeslotAssignments[e] < timeslotsPerWeek;
 
                             int bestSlot = -1;
-                            int bestCount = int.MaxValue;
-                            bool bestSameWeek = false;
+                            int bestScore = int.MaxValue;
 
                             for (int nt = 0; nt < totalTimeslots; nt++)
                             {
@@ -299,17 +298,18 @@ namespace Infrastructure.Services
                                 }
                                 if (conflict) continue;
 
+                                // Score: prefer same-week, then early slots, then low occupancy
+                                // Lower score = better target
                                 bool ntSameWeek = (nt < timeslotsPerWeek) == inWeek0;
-                                if (ntSameWeek && !bestSameWeek)
+                                int ntSlotInDay = nt % slotsPerDay;
+                                int score = (ntSameWeek ? 0 : 100000)     // same week strongly preferred
+                                          + ntSlotInDay * 1000            // early slots preferred (0-3 < 4 < 5)
+                                          + slotCounts[nt];               // less crowded preferred
+
+                                if (score < bestScore)
                                 {
                                     bestSlot = nt;
-                                    bestCount = slotCounts[nt];
-                                    bestSameWeek = true;
-                                }
-                                else if (ntSameWeek == bestSameWeek && slotCounts[nt] < bestCount)
-                                {
-                                    bestSlot = nt;
-                                    bestCount = slotCounts[nt];
+                                    bestScore = score;
                                 }
                             }
 
@@ -546,9 +546,10 @@ namespace Infrastructure.Services
                         int direction = currentSlot > medianSlot ? -1 : (currentSlot < medianSlot ? 1 : 0);
                         if (direction == 0) continue;
 
-                        // Try to move one slot toward median
+                        // Try to move one slot toward median, but never into late slots (5th/6th pair)
                         int targetSlotInDay = currentSlot + direction;
                         if (targetSlotInDay < 0 || targetSlotInDay >= slotsPerDay) continue;
+                        if (targetSlotInDay >= 4) continue; // don't move into 5th/6th pair
 
                         int targetTs = dayBase + targetSlotInDay;
                         int oldTs = timeslotAssignments[e];
