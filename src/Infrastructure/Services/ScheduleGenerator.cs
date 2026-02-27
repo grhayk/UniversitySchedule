@@ -52,15 +52,15 @@ namespace Infrastructure.Services
             var midDomain = SatDomain.FromValues(earlyTs.Concat(midTs).ToArray());               // 50 slots
             var fullDomain = SatDomain.FromFlatIntervals(new long[] { 0, totalTimeslots - 1 });  // 60 slots
 
-            // Count events per lecturer and per busy group to determine who needs more room
+            // Count events per lecturer and per busy group to determine who needs more room.
+            // Use demand.Hours as increment since each demand expands into that many events.
             var eventsPerLecturer = new Dictionary<int, int>();
             var eventsPerGroup = new Dictionary<int, int>();
-            for (int e = 0; e < events.Count; e++)
+            foreach (var dem in demands)
             {
-                var dem = demands[events[e].DemandIndex];
-                eventsPerLecturer[dem.LecturerId] = eventsPerLecturer.GetValueOrDefault(dem.LecturerId) + 1;
+                eventsPerLecturer[dem.LecturerId] = eventsPerLecturer.GetValueOrDefault(dem.LecturerId) + dem.Hours;
                 foreach (var gId in dem.BusyGroupIds)
-                    eventsPerGroup[gId] = eventsPerGroup.GetValueOrDefault(gId) + 1;
+                    eventsPerGroup[gId] = eventsPerGroup.GetValueOrDefault(gId) + dem.Hours;
             }
 
             int earlyCount = 0, midCount = 0, fullCount = 0;
