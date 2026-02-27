@@ -77,12 +77,22 @@ namespace Application.Features.Schedules.GenerateSchedule
                 .ToDictionary(c => c.Id, c => c.Characteristics!.SeatCapacity);
 
             stepSw.Restart();
+            // Parent group counts: Students.GroupId always points to the parent group
             var studentCountByGroup = await _context.Students
                 .Where(s => s.GroupId.HasValue)
                 .GroupBy(s => s.GroupId!.Value)
                 .Select(g => new { GroupId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.GroupId, x => x.Count, ct);
-            Console.WriteLine($"  Loaded student counts for {studentCountByGroup.Count} groups ({stepSw.ElapsedMilliseconds}ms)");
+
+            // Child group counts: from StudentGroups, filtered to current semester only
+            // (StudentGroups has historical records; sg.SemesterId == student's parent group SemesterId = current)
+            var childGroupStudentCounts = await _context.StudentGroups
+                .Where(sg => sg.SemesterId == sg.Student.Group!.SemesterId)
+                .GroupBy(sg => sg.GroupId)
+                .Select(g => new { GroupId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.GroupId, x => x.Count, ct);
+
+            Console.WriteLine($"  Loaded student counts for {studentCountByGroup.Count} parent groups, {childGroupStudentCounts.Count} child groups ({stepSw.ElapsedMilliseconds}ms)");
             Console.WriteLine($"[Step 1] Done ({totalSw.ElapsedMilliseconds}ms total)");
 
             // Step 2: Build LessonDemand list
@@ -127,15 +137,15 @@ namespace Application.Features.Schedules.GenerateSchedule
                             busyGroupIds.Add(group.ParentId.Value);
                     }
 
-                    if (gswl.LessonType == LessonType.Lecture && group.Children.Any())
+                    if (gswl.LessonType == LessonType.Lecture)
                     {
-                        studentCount = group.Children
-                            .Sum(c => studentCountByGroup.GetValueOrDefault(c.Id, 0));
-                        studentCount += studentCountByGroup.GetValueOrDefault(group.Id, 0);
+                        // All students in the parent group attend the lecture
+                        studentCount = studentCountByGroup.GetValueOrDefault(group.Id, 0);
                     }
                     else
                     {
-                        studentCount = studentCountByGroup.GetValueOrDefault(group.Id, 0);
+                        // Practical/Lab: only students assigned to this child group
+                        studentCount = childGroupStudentCounts.GetValueOrDefault(group.Id, 0);
                     }
                 }
                 else
